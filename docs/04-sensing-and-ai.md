@@ -2,7 +2,7 @@
 
 > Status: Design (Draft 2) · Owner: Sensing/Fusion area · Target phases: **Phase 2** (scale) and **Phase 3** (camera + nutrition + fusion)
 > Ring: **2 — Sensing Layer** (on-device only; imports Ring 1, never imports Ring 3)
-> Package footprint: `@chewie/fusion` (this doc's core), `@chewie/nutrition` (optional insight), plus native seams in `apps/mobile` for BLE and camera. Shared cross-ring types (`Estimate<T>`, `BiteEvent`, `SensorMode`, `SensorSource`) live in the Ring‑1 package `@chewie/core-types` and are **re‑exported, never re‑defined** here.
+> Package footprint: `@chewie/fusion` (this doc's core), `@chewie/nutrition` (optional insight), plus native seams in `apps/mobile` for BLE and camera. Shared cross-ring types (`Estimate<T>`, `BiteEvent`, `SensorMode`, `SensorSource`) live in the Ring‑1 package `@chewie/core-types` and are **re‑exported, never re‑defined** here. A new opt‑in Ring‑2 consumer, **`@chewie/nourishment`** (`docs/10-nourishment-and-intake-targets.md`), reads this doc's **`MealEstimate`** intake fields; it lives entirely on the *intake* side of the §7.3 wall and does not change fusion.
 
 This document specifies the **optional** sensing layer that sits on top of the Calm Core. Ring 2 is severable: with `RING2_SENSING_ENABLED = false` the app is the complete Phase‑1 product. Nothing here may weaken that guarantee.
 
@@ -12,15 +12,16 @@ This repo uses one numbering scheme: `docs/NN-topic.md` for design docs, `docs/a
 
 | Path | What it owns (relative to this doc) |
 |---|---|
-| `docs/00-architecture-spine.md` | Canonical rings/stack; the source of truth all docs conform to. |
+| `docs/02-system-architecture.md` | Canonical rings/stack; the source of truth all docs conform to. |
 | `docs/01-product-vision.md` | Product framing, personas, the ethical mandate. |
 | `docs/02-system-architecture.md` | Ring/package boundaries, the module import rules this doc obeys. |
 | `docs/03-chewing-engine-and-art.md` | `@chewie/engine` XState session, the **`ChewieClock`** sleep‑inclusive monotonic clock this layer timestamps against, and **in‑progress session persistence** (process‑death recovery). |
 | `docs/05-scoring-model.md` | `@chewie/scoring`; consumes only the dimensionless `BehaviorSignals` defined here. Owns the chew sub‑score confidence table. |
-| `docs/06-companion-plane.md` | Ring 3; consumes structured state, not raw sensor streams. Shares the thermal budget in companion mode. |
-| `docs/07-data-and-persistence.md` | SQLite schema, `LocalProfile`, default‑timings config, the persisted checkpoint shape, and the single/multi‑profile decision. |
-| `docs/08-privacy-safeguards-and-onboarding.md` | GDPR Article 9 handling, DPIA, disordered‑use safeguard, age‑band/first‑run flow. |
-| `docs/09-testing-spikes-and-dod.md` | Spike plan (S1/S2/S3), Definition of Done, battery/thermal budget gate. |
+| `docs/06-companion-and-pairing.md` | Ring 3; consumes structured state, not raw sensor streams. Shares the thermal budget in companion mode. |
+| `docs/07-data-model-and-privacy.md` | SQLite schema, `LocalProfile`, default‑timings config, the persisted checkpoint shape, and the single/multi‑profile decision. |
+| `docs/08-responsible-design-and-safety.md` | GDPR Article 9 handling, DPIA, disordered‑use safeguard, age‑band/first‑run flow. |
+| `docs/09-roadmap-and-mvp.md` | Spike plan (S1/S2/S3), Definition of Done, battery/thermal budget gate. |
+| `docs/10-nourishment-and-intake-targets.md` | Opt‑in, adults‑only **Nourishment Mode** (package `@chewie/nourishment`). **Consumes** this doc's `MealEstimate` — specifically `nutrition.macros.energyKcal` and `totalConsumedG` (both ranged `Estimate`s, §6/§8) — to score a **two‑sided Portion Balance (Adequacy)** against a personal target band. Lives on the *intake* branch, right of the §7.3 wall; the wall and `@chewie/scoring` are **unchanged**. |
 
 **ADR index (canonical numbering — no collisions):**
 `0001` client‑react‑native‑expo · `0002` concentric‑rings · `0003` supabase‑backend · `0004` ondevice‑first‑ai · `0005` scale‑primary‑and‑fusion‑modes · `0006` scale‑driver‑abstraction · `0007` companion‑webrtc‑p2p · `0008` isolated‑behavior‑scoring · `0009` local‑first‑encrypted‑sqlite · `0010` monotonic‑clock‑timing. This doc leans on `0004`, `0005`, `0006`, `0008`, `0010`.
@@ -53,6 +54,7 @@ flowchart LR
     E[Session Engine\n@chewie/engine · ChewieClock] -->|phase / countdown| F
     F -->|BehaviorSignals\nDIMENSIONLESS| SC[@chewie/scoring\nBehaviorScore]
     F -->|MealEstimate\ngrams · macros · ranges| N[@chewie/nutrition\nBalanceInsight · optional/hideable]
+    F -->|MealEstimate\nenergy · mass · ranges| NM[@chewie/nourishment\nPortion Balance · opt-in/adults-only · docs/10]
     F -->|local-only usage patterns| SG[Disordered-use safeguard\nlocal heuristic]
     F -->|structured state| R3[(to Ring 3 companion\nphase/bite/score/tip only)]
   end
@@ -507,6 +509,8 @@ For nutrient X (e.g. kcal):
 
 **Confidence is dominated by food‑ID and DB variance, not by grams.** Even with a perfect scale, meal energy is realistically **±20–50%**; camera‑only is worse. We show the range and a "rough estimate — not medical advice" label, and never render a bare number (enforced by the shared `Estimate` UI component).
 
+> **Adequacy consumer (opt‑in).** When (and only when) the user has enabled Nourishment Mode, the same ranged `macros.energyKcal` `Estimate` produced here (and `totalConsumedG` mass, §8.2) is **also** read by `@chewie/nourishment` (`docs/10`) to compute a two‑sided Portion Balance against a personal target band. This changes **nothing** in fusion or nutrition: the estimate is still off by default, `intakeNumbersHidden`‑gated, range‑only, and never a bare number. `@chewie/nourishment` is a *downstream reader* of these fields — it lives on the intake side of the §7.3 wall and never contributes to `BehaviorSignals`.
+
 ```ts
 export interface BalanceInsight {              // NOT a score, NOT /100
   variety: Array<{ group: string; presence: 'present' | 'light' | 'absent' }>;
@@ -560,8 +564,11 @@ flowchart LR
   FUS --> I[Intake\ngrams · macros · Estimate ranges]
   B --> SC[@chewie/scoring · BehaviorScore\nscoreBehavior(signals) — cannot receive grams]
   I --> NU[@chewie/nutrition · BalanceInsight\noff by default · hideable · ranges]
+  I --> NM[@chewie/nourishment · Portion Balance\nopt-in · adults-only · hideable\ntwo-sided Adequacy vs target band · docs/10]
   I -. blocked .- SC
 ```
+
+**The wall is unchanged by Nourishment Mode.** `@chewie/nourishment` (`docs/10`) is a **new consumer on the *intake* (right) branch only** — it reads `MealEstimate` fields (`totalConsumedG`, `nutrition.macros.energyKcal`; §8.2) and never sees `BehaviorSignals`, never calls `scoreBehavior()`, and never hands intake to the behavior scorer. Adequacy is therefore a *second, parallel score on the intake side*, not a modification of the behavior path: grams and calories still exist **only** on the right branch, and the left branch that reaches `@chewie/scoring` stays dimensionless. A dependency rule (`docs/10 §10`) forbids `@chewie/nourishment` from importing `scoreBehavior`, so this separation is structural, not a convention.
 
 ```ts
 // packages/fusion/src/behavior.ts — the ONLY thing scoring may consume.
@@ -582,7 +589,7 @@ The **band mapping** (grams/min → `paceBandPosition`, grams/bite → `biteSize
 
 ### 7.4 Local‑only safeguard hook — and an honest limit on what it can detect (major fix)
 
-Fusion emits **local‑only** usage/pattern signals to the on‑device disordered‑use heuristic. These **never** go to the companion or cloud, can soften/disable scoring, and are easy to turn off so the safeguard can't itself become a shaming vector. Details in `docs/08-privacy-safeguards-and-onboarding.md`.
+Fusion emits **local‑only** usage/pattern signals to the on‑device disordered‑use heuristic. These **never** go to the companion or cloud, can soften/disable scoring, and are easy to turn off so the safeguard can't itself become a shaming vector. Details in `docs/08-responsible-design-and-safety.md`.
 
 **Honest structural limitation (must be stated wherever safeguard triggers are listed — 01 §10.4, 05 §8.4, 08 §3.7):** the safeguard's *strongest* intended signals — **"sustained extreme‑low intake"** and **"skipped‑meal pattern"** — depend on data that is **dark for exactly the highest‑risk users**:
 - **Extreme‑low‑intake detection requires the intake pipeline to be ON.** But intake is off by default and a restricting user is likely to keep it off — so this signal is usually unavailable when it matters most.
@@ -697,17 +704,32 @@ export interface MealSensingSession {
 export interface MealEstimate {
   mode: SensorMode;
   biteCount: number;
-  totalConsumedG?: Estimate<number>;     // Σ bite/drink ΔW; absent if shared-plate/NONE
+  totalConsumedG?: Estimate<number>;     // Σ bite/drink ΔW; absent if shared-plate/NONE  ← adequacy MASS input (docs/10 §4.6)
   meanGramsPerBite?: Estimate<number>;
   paceGramsPerMin?: Estimate<number>;
   paceCurve?: Array<{ tMonoMs: number; gPerMin: number }>;
-  behaviorSummary: BehaviorSignals;      // crosses to scoring (dimensionless only)
-  nutrition?: BalanceInsight;            // optional, hideable, ranges — never /100
+  behaviorSummary: BehaviorSignals;      // crosses to scoring (dimensionless only) — NOT read by @chewie/nourishment
+  nutrition?: BalanceInsight;            // optional, hideable, ranges — never /100; nutrition.macros.energyKcal is the adequacy ENERGY input (docs/10 §5.2)
   overallConfidence: Confidence;
   provenance: Record<string, SensorSource>;
-  disclaimers: string[];                 // e.g. "rough estimate — not medical advice", gap/shared-plate notes
+  disclaimers: string[];                 // e.g. "rough estimate — not medical advice", gap/shared-plate notes; carried through onto PortionBalance (docs/10 §5.2)
+  // deliberately NO: userWeight, bmi, goal, calorieBudget, target, deficit — targets are derived in @chewie/nourishment, never stored here.
 }
 ```
+
+**The `@chewie/nourishment`‑facing intake contract (docs/10 §5).** Adequacy needs the total‑intake and per‑meal energy/mass estimates *with their confidence ranges* — all of which already exist here as ranged `Estimate<number>`s and need no new fusion code:
+
+| Field consumed by `@chewie/nourishment` | Role in Portion Balance | Honesty preserved |
+|---|---|---|
+| `nutrition.macros.energyKcal` (`Estimate<number>`) | **primary** — energy vs the per‑meal target band (`docs/10 §5.2`) | inherits fusion's wide **±20–50%** energy confidence (§6.2, §9); carried as a `low..high` range, never a bare number |
+| `totalConsumedG` (`Estimate<number>`) | **fallback** — mass band in `SCALE_ONLY` where energy is a wide range (`docs/10 §4.6`) | scale‑grade range with per‑bite confidence (§4.6); absent (→ Adequacy simply does not compute) for shared‑plate/`NONE` |
+| `disclaimers`, `overallConfidence` | passed straight through onto the surfaced `PortionBalance` | the standing "rough estimate — not medical advice" caption and gap/shared‑plate notes travel with the number |
+
+Contract rules that keep this a *clean boundary*, not a leak:
+
+- **Read‑only, right of the wall.** `@chewie/nourishment` imports `MealEstimate` as a **type** and reads the intake fields above. It **never** reads `behaviorSummary`, never calls `scoreBehavior()`, and adds nothing to `BehaviorSignals` — the §7.3 wall and property tests P1–P4 are untouched.
+- **No new precision.** Fusion does **not** tighten any estimate for the adequacy consumer. If `energyKcal`/`totalConsumedG` is absent or wide, it stays absent/wide; Adequacy either doesn't compute or surfaces the same honest range. We do **not** add a "calories eaten" scalar or any goal/target/deficit field to `MealEstimate`.
+- **The meal `slot`** (`BREAKFAST`/`LUNCH`/`DINNER`/`SNACK`) that Adequacy scores against comes from the **Ring‑1 meal context**, not from this shape — fusion stays slot‑agnostic (`docs/10 §5.2` passes it alongside the `MealEstimate`).
 
 ### 8.3 In‑progress recovery: sensing checkpoint (blocker fix)
 
@@ -746,7 +768,7 @@ Per‑bite `Estimate.confidence` **visibly degrades** for OCR/adv sources, 1 g r
 
 ## 10. Risks & mitigations (this layer)
 
-- **Eating‑disorder / surveillance harm (dominant).** Mitigated structurally: dimensionless behavior‑only path into scoring, symmetric bands (below‑band never raises score), intake off/hideable and pipeline‑disable‑able, local‑only safeguard, self‑vs‑self only. **Must be validated by an ED clinician before any intake feature ships** (Phase 3 gate). Honest caveat: the safeguard's intake/skipped‑meal triggers are dark for disengaged restrictors (§7.4).
+- **Eating‑disorder / surveillance harm (dominant).** Mitigated structurally: dimensionless behavior‑only path into scoring, symmetric bands (below‑band never raises score), intake off/hideable and pipeline‑disable‑able, local‑only safeguard, self‑vs‑self only. **Must be validated by an ED clinician before any intake feature ships** (Phase 3 gate). Honest caveat: the safeguard's intake/skipped‑meal triggers are dark for disengaged restrictors (§7.4). The opt‑in adequacy consumer `@chewie/nourishment` (`docs/10`) reads the same intake estimates but is a **downstream reader only** — it cannot reach `scoreBehavior()`, its Adequacy score is **two‑sided** (under‑eating lowers it too) and clamped to the healthy range, and it is gated behind the same intake pipeline plus its own adults‑only enrollment and the blocking ED‑clinician review.
 - **Scale platform‑fit + fragmentation + auto‑power‑off + stabilize‑only.** Mitigated: two‑axis reference criteria (footprint/capacity/off‑centre AND streaming firmware), curated supported list, keep‑alive writes, **conditional** OCR, manual fallback. S1 validates with a real plate/bowl. *Do not over‑promise device compatibility at launch.*
 - **Scale reconnect / lost tare mid‑meal (§4.7).** Mitigated: gap suppression, baseline re‑anchor, calm re‑tare prompt, `SPANS_GAP` flags, reduced confidence; a reconnect can never fabricate a giant bite.
 - **Shared plate / multiple eaters (§4.8).** Mitigated: detect and enter a calm "can't measure" behavior‑only state; grams suppressed, not faked; per‑person quantitative sensing explicitly out of scope.
@@ -764,6 +786,7 @@ Per‑bite `Estimate.confidence` **visibly degrades** for OCR/adv sources, 1 g r
 
 - **Phase 2 — Scale as ground truth (fully local):** `react-native-ble-plx` + driver abstraction (0x181D → vendor → conditional OCR → manual), the §4 segmentation state machine **including reconnect/re‑tare (§4.7) and shared‑plate detection (§4.8)**, `SCALE_ONLY` fusion, band‑based signals into scoring with property tests, "battle‑yourself" baseline, and the sensing checkpoint slice (§8.3). Intake numbers optional/ranged/hideable. No cloud. Gated by S1 (plate‑fit + step detection) and S2 (sleep‑inclusive clock across lock→sleep→resume).
 - **Phase 3 — On‑device camera sensing (all on‑device):** VisionCamera frame processors (food classifier, MediaPipe hand bite‑proxy, ArUco homography), all four fusion modes, conditional camera‑OCR scale fallback, optional `BalanceInsight` (off by default, ranges), optional `CAMERA_FACE_ENABLED` chew count, and the explicit single‑frame blurred cloud "second opinion." **Gated by S3 (low‑end camera/thermal budget)** and an **ED‑clinician review of every intake feature**.
+- **Phase 3+ — Nourishment Mode consumer (`docs/10`):** with the intake pipeline in place, `@chewie/nourishment` reads the `MealEstimate` energy/mass estimates specified in §8.2 to produce the opt‑in, adults‑only, two‑sided Portion Balance. No fusion change is required — this layer only *exposes* the ranged estimates; the target math, clamp, care routing, and consent all live in `docs/10`, behind the same blocking ED‑clinician gate.
 
 ---
 

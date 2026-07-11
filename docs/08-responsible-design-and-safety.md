@@ -1,21 +1,22 @@
 # Chewie — Responsible Design, Safety & Accessibility
 
 > **Status:** Design (v2, Phase 0 baseline) · **Owner:** Responsible Design, Safety & Accessibility area · **Applies to:** all rings, all phases
-> **Committed path:** `docs/08-responsible-design-and-safety.md`. This is the doc that sibling docs reference at slot **08** for privacy-UX, the disordered-use safeguard's *policy/consent framing*, DPIA line items, Article-9 handling, age-appropriateness, first-run safety requirements, and accessibility. (`docs/04-sensing-and-ai.md` calls it `08-privacy-safeguards-and-onboarding.md`; `docs/05-scoring-model.md` calls it `08-privacy-dpia.md`. **Exact-filename reconciliation across the set is owned by `docs/00-architecture-spine.md` + the CI link-checker** — see OQ-7.)
+> **Committed path:** `docs/08-responsible-design-and-safety.md`. This is the doc that sibling docs reference at slot **08** for privacy-UX, the disordered-use safeguard's *policy/consent framing*, DPIA line items, Article-9 handling, age-appropriateness, first-run safety requirements, and accessibility. (`docs/04-sensing-and-ai.md` calls it `08-privacy-safeguards-and-onboarding.md`; `docs/05-scoring-model.md` calls it `08-privacy-dpia.md`. **Exact-filename reconciliation across the set is owned by `docs/02-system-architecture.md` + the CI link-checker** — see OQ-7.)
 
 ### Related docs (single `docs/NN-*.md` scheme; the spine is the authority, CI link-checks every link)
 
 | Doc | What it owns that this doc depends on |
 |---|---|
-| `docs/00-architecture-spine.md` | The canonical spine; the single authority reconciling doc filenames; the ADR-index pointer; the `pnpm docs:links` CI policy. |
+| `docs/02-system-architecture.md` | The canonical spine; the single authority reconciling doc filenames; the ADR-index pointer; the `pnpm docs:links` CI policy. |
 | `docs/01-product-vision.md` | Vision, personas, core loop, the **first-run/onboarding-flow owner** (age-gate-first, permission priming, first-meal guidance, empty states), and the `ChewieClock` timing requirements. |
 | `docs/02-system-architecture.md` | `@chewie/core-types` — the ONE home of `Estimate<T>`, `BiteEvent`, `SensorMode`, `DEFAULT_TIMINGS` (§5.4–5.6); the ring-boundary lint; the **single ADR index (§5.6)**; the `ChewieClock` contract (§8.2). |
 | `docs/03-chewing-engine-and-art.md` | `@chewie/engine`, the **native sleep-inclusive `ChewieClock` module (§2.2)**, in-progress session checkpoint & crash recovery, ChewArt generation. |
 | `docs/04-sensing-and-ai.md` | `@chewie/fusion`, `SensorMode`, the on-device Article-9 camera pipeline, the blurred single-frame cloud "second opinion." |
 | `docs/05-scoring-model.md` | `@chewie/scoring` band math + property tests, coaching, and — **authoritatively — the on-device disordered-use safeguard (§11) and its honest detection limits (§11.2)**, plus the Balance & Variety insight *contract*. |
 | `docs/06-companion-and-pairing.md` | Ring 3 WebRTC/Supabase pairing, RLS, Presence, `CompanionStateMsg`. |
-| `docs/07-data-model-and-privacy.md` | Encrypted SQLite schema (**no weight/BMI/goal columns**), the `LocalProfile` model + age-band field, `SessionCheckpoint`; co-owns the shared-device decision (§8 here). |
-| `docs/09-design-system.md` | Tokens (no red/failure states), motion, haptics; home of the shared `<EstimateValue>` component. |
+| `docs/07-data-model-and-privacy.md` | Encrypted SQLite schema (**no goal/target/deficit/BMI columns anywhere**; current height/weight live only in the reviewed, opt-in `anthropometric_profile` health module), the `LocalProfile` model + age-band field, `SessionCheckpoint`; co-owns the shared-device decision (§8 here). |
+| `docs/03-chewing-engine-and-art.md` | Tokens (no red/failure states), motion, haptics; home of the shared `<EstimateValue>` component. |
+| `docs/10-nourishment-and-intake-targets.md` | **Nourishment Mode** — the opt-in, adults-only, off-by-default, two-sided **Portion Balance** (Adequacy) plane in `@chewie/nourishment`. This doc owns its age gate (§7), care-pathway routing (§3.7), R-HUD-1 preservation (§3.3), honesty-of-estimate rules (§5), and the banned-lexicon narrowing for `"bmi"` (§3.5.1). |
 | `docs/adr/README.md` | The single ADR index — every ADR below is cited by that index, never re-numbered here. |
 
 **ADRs referenced (by the single index only):** `0002-concentric-rings-topology`, `0004-ondevice-first-ai`, `0007-companion-webrtc-p2p`, `0008-isolated-behavior-scoring`, `0010-continuous-clock-timing-and-recovery`.
@@ -56,7 +57,7 @@ The ethical mandate restated as engineering invariants this doc is accountable f
 | P1 | Score measures **behavior only** | `scoreBehavior()` type signature cannot receive grams/kcal; property tests (ADR-0008) | `docs/05-scoring-model.md` (constraints restated here §3.1) |
 | P2 | Healthy **bands**, never "minimize" | Symmetric distance-from-band curves; property test "reducing intake below band never raises score" | `docs/05-scoring-model.md` |
 | P3 | Intake/nutrition **off by default, hideable, disableable** | `intakeNumbersHidden` single selector gates render **and** pipeline | this doc §3.2 |
-| P4 | **No weight-loss framing** | Schema has no weight/BMI/goal columns; onboarding copy catalog forbids diet lexicon | `docs/07-data-model-and-privacy.md` schema + this doc §3.5 |
+| P4 | **No weight-loss framing; adequacy only** | No goal/target/deficit/BMI *columns* anywhere; copy catalog hard-bans diet lexicon; where an *adequacy* goal is offered (opt-in **Nourishment Mode**, `docs/10`) it is **two-sided** (under- and over-eating both lower the score), **clamped to the healthy range**, and has **no reduce API** — a weight-loss/deficit flow stays un-buildable | `docs/07-data-model-and-privacy.md` schema + this doc §3.5, §3.8 + `docs/10` |
 | P5 | Estimates are **ranged & honest** | Canonical `Estimate<T>` (`@chewie/core-types`) + `<EstimateValue>` + lint rule | this doc §5 |
 | P6 | **Gentle continuity**, no punitive streaks | `freeze`/`rest-day` model; message catalog has no failure templates | this doc §3.4 |
 | P7 | **Consent-first, revocable, ephemeral** companion | RLS + Presence + explicit pairing; no record path (ADR-0007) | `docs/06-companion-and-pairing.md` (UX/consent rules here §4) |
@@ -109,7 +110,7 @@ Each vector is answered by named controls in §3–§9 and cross-checked in the 
 The score is computed in `docs/05-scoring-model.md` / `@chewie/scoring` under **ADR-0008 (isolated behavior scoring)**; **this doc owns the constraints it must satisfy** and restates them so they can be reviewed here:
 
 - The primary score is `BehaviorScore` (1–100). Its input type is *only* behavior signals. Intake is not a parameter — there is no code path from grams/kcal into it.
-- All banded signals are **symmetric** in principle: too-fast and too-slow both lower the score; too-big and too-small bites both lower it. Center of band = 100. Monotonic "less is better" curves are prohibited. (`docs/05` may deliberately make the *fast* side decline more sharply than the *slow* side — savoring-aligned — but never introduces a "less food raises score" gradient; extreme prolongation is left to the safeguard, not a punitive curve.)
+- All banded signals are **symmetric** in principle: too-fast and too-slow both lower the score; center of band = 100. Monotonic "less is better" curves are prohibited. Bite *size* is deliberately **not** scored as an absolute band — small bites are never penalized (`docs/05-scoring-model.md` §5.4, property P5); only bite *uniformity / rhythm* (erratic vs. even inter-bite spacing, a dimensionless CV) is scored, and that dimension is itself symmetric. (`docs/05-scoring-model.md` may deliberately make the *fast* side decline more sharply than the *slow* side — savoring-aligned — but never introduces a "less food raises score" gradient; extreme prolongation is left to the safeguard, not a punitive curve.)
 - **"Battle yourself" is self-vs-self only** — the baseline is the eater's own gently-adapting rolling statistic, never a population norm or another person; and safeguarded/unattended sessions are ineligible to set a personal best (`docs/05` §8).
 
 ```ts
@@ -195,11 +196,13 @@ interface Continuity {
 
 > Day-boundary logic uses the local **calendar day** (persisted), not a monotonic timer — a freeze must survive a reboot and a locked screen. See the clock note in §3.7.2.
 
-### 3.5 No weight-loss framing (P4) — enforced by schema absence + lexicon lint
+### 3.5 No weight-loss framing (P4) — enforced by schema scope + lexicon lint
 
-- **R-FRAME-1:** onboarding centers digestion, satiety awareness, savoring, calm. No BMI, no weight, no calorie budget, no goal-weight, no "burn/deficit" language anywhere.
-- **R-FRAME-2:** the data schema (owned by `docs/07-data-model-and-privacy.md`) has **no** `weight`, `bmi`, `goal`, `targetCalories`, or `deficit` columns, so a diet flow *cannot be built without a reviewed schema change*.
-- **R-FRAME-3:** a CI lexicon lint (§3.5.1) blocks banned diet/shame tokens from all user-facing strings.
+The default product is weight-loss-free, and the **only** sanctioned place any anthropometric input or BMI derivation may exist is the opt-in, adults-only, two-sided **Nourishment Mode** (§3.8, `docs/10`). These rules keep a diet flow un-buildable while permitting that one guarded, adequacy-only feature.
+
+- **R-FRAME-1:** the *default* onboarding centers digestion, satiety awareness, savoring, calm — no BMI, no weight, no calorie budget, no goal-weight, no "burn/deficit" language. The **separate** Nourishment Mode enrollment (age-gated ADULT, its own Art-9 interstitial, `docs/10` §2) may collect height/weight/age/sex/activity, but its copy centers **adequacy and savoring** ("enough to feel nourished"), never reduction — and it is off by default for everyone.
+- **R-FRAME-2 (schema scope, not schema absence):** the data schema (owned by `docs/07-data-model-and-privacy.md`) has **no** `goal_weight`, `target_weight`, `weight_loss`, `calorie_budget`, `deficit`, or `bmi` columns **anywhere** — BMI and the healthy range are derived at runtime, never stored. Current `height_cm`/`weight_kg`/`age_years`/`sex`/`activity` are permitted **only** in the reviewed, opt-in `anthropometric_profile` table (`docs/07` §12.4, `docs/10` §3.2), which requires a linked clinician-review id. So a reducing/diet flow still *cannot be built without a reviewed, table-scoped schema change* — and even then the reduce direction is structurally impossible (§3.8).
+- **R-FRAME-3:** a CI lexicon lint (§3.5.1) blocks banned diet/shame tokens from all user-facing strings; `"bmi"`/`"weight"` are `reviewRequired` (permitted only on Nourishment Mode surfaces with clinician sign-off), while every weight-*loss* token stays hard-banned.
 
 #### 3.5.1 Banned lexicon (CI-enforced against the i18n catalog)
 
@@ -210,17 +213,18 @@ interface Continuity {
     "weight loss", "lose weight", "diet", "calorie deficit", "burn calories",
     "guilty", "cheat meal", "bad food", "junk", "shame", "failed", "you failed",
     "streak broken", "over your limit", "too many calories", "fat", "skinny",
-    "slim down", "bmi", "goal weight", "punish", "earn it", "work it off"
+    "slim down", "goal weight", "punish", "earn it", "work it off"
   ],
   "reviewRequired": [   // allowed only with clinician sign-off recorded in the PR
     "calorie", "calories", "kcal", "portion", "grams", "healthy", "unhealthy",
-    "restrict", "control", "less", "reduce"
+    "restrict", "control", "less", "reduce",
+    "bmi", "weight"     // opt-in Nourishment Mode context ONLY (docs/10) — computed for ADEQUACY, never weight loss
   ],
-  "notes": "Case-insensitive, whole-word, across all locales (nl + en). A hardBanned hit fails CI. A reviewRequired hit requires a linked clinician-review approval id in the PR body."
+  "notes": "Case-insensitive, whole-word, across all locales (nl + en). A hardBanned hit fails CI. A reviewRequired hit requires a linked clinician-review approval id in the PR body. 'bmi'/'weight' were moved from hardBanned to reviewRequired to permit the opt-in, adults-only, two-sided Nourishment Mode (docs/10) to name BMI and current weight for an ADEQUACY goal; every weight-LOSS token ('weight loss', 'lose weight', 'goal weight', 'calorie deficit', 'slim down', 'diet') stays hard-banned, so the reduce/diet framing is still impossible."
 }
 ```
 
-> The `reviewRequired` list deliberately includes words we *sometimes* need (e.g. "calorie" inside an opt-in insight). CI doesn't ban them — it forces a human/clinician decision, so tone drift can't slip in silently.
+> The `reviewRequired` list deliberately includes words we *sometimes* need (e.g. "calorie" inside an opt-in insight, or "bmi"/"weight" inside a Nourishment Mode adequacy surface). CI doesn't ban them — it forces a human/clinician decision, so tone drift can't slip in silently. Note the asymmetry: `"bmi"`/`"weight"` are review-gated (a legitimate adequacy feature needs them), but `"weight loss"`/`"lose weight"`/`"goal weight"` remain **hard-banned** — the feature computes BMI but never does weight loss.
 
 ### 3.6 Thoughtful defaults & anti-comparison (P3, P10)
 
@@ -260,11 +264,12 @@ This is the most sensitive feature in the app. **Ownership split (to avoid the c
 ```ts
 type CareSignalKind =
   | 'SKIPPED_MEAL_PATTERN'        // meal cadence unusually sparse over the window (engagement-gated, see 3.7.3)
-  | 'EXTREME_LOW_BITE_TARGET'     // user manually set bite size / timings to extreme-restrictive values
+  | 'EXTREME_LOW_BITE_TARGET'     // user manually set bite size / timings — OR a Nourishment Mode intake target — to extreme-restrictive values (§3.8, docs/10 §8.3)
   | 'OBSESSIVE_RECHECK'           // compulsive opening/closing of intake or score surfaces
   | 'COMPULSIVE_NUMBER_TOGGLING'  // rapidly enabling/disabling numbers repeatedly
   | 'SESSION_SHAPE_ANOMALY'       // e.g. sessions abandoned early & repeatedly, or extreme durations
-  | 'SUSTAINED_EXTREME_LOW_INTAKE'; // OPTIONAL & engagement-gated — only if intake pipeline already enabled
+  | 'UNDERWEIGHT_STATS'           // Nourishment Mode anthropometric stats indicate BMI < 18.5 — routes at enrollment; NO reducing target is ever built (§3.8, docs/10 §8.2)
+  | 'SUSTAINED_EXTREME_LOW_INTAKE'; // OPTIONAL & engagement-gated — repeated below-band / low-intake meals; observable only if the intake pipeline (or Nourishment Mode) is enabled
 
 interface CareSignal {
   kind: CareSignalKind;
@@ -378,6 +383,22 @@ interface SupportResource {
 - **Ship-blocker:** exact org names, numbers, and URLs must be verified by the reviewing clinician before any build that includes Level 3 (or the §3.7.6 floor) ships (Phase 1). *We deliberately do not hard-code specific hotline numbers in this design doc* — an out-of-date number in a care surface is worse than none. NL/EU eating-disorder and mental-health organisations are the seed set; the reviewer confirms current details and adds region fallbacks.
 - If no verified resource exists for the user's region, both Level 3 and the passive floor fall back to a general *"talking to your GP / a trusted person can help"* message rather than an unverified number.
 
+### 3.8 Nourishment Mode — a guarded, opt-in, two-sided adequacy plane (policy for `docs/10`)
+
+The product owner has decided Chewie must offer an **adequacy** feature: an adult can enter height/weight/age/sex/activity, have the app derive BMI, a WHO healthy-weight **range**, and an energy need (TDEE), and be coached toward a **per-meal target band** — an *ideal amount* to get **into and stay inside**, where **both under- and over-eating lower the score.** The engineering spec is `docs/10-nourishment-and-intake-targets.md` (feature: *Nourishment Mode*; score: *Portion Balance* / *Adequacy*; package: `@chewie/nourishment`). This is **not** a weight-loss flow: there is no "minimize" direction and no target below the healthy range. This doc owns the *safety guardrails* that keep it that way — the earlier v2 *prohibition* is converted here into these **guardrails on a live feature**, none of them weakened.
+
+- **R-NOURISH-AGE (adults-only age gate):** Nourishment Mode is available **only** to a `LocalProfile` whose `ageBand === 'ADULT'` (§7). `UNDER_16`, `AGE_16_17`, and `UNDISCLOSED` **cannot enroll** — deliberately *stricter* than the plain intake pipeline (which `AGE_16_17` may enable with friction), because anthropometric/BMI data is more susceptible to weight-preoccupation harm in adolescents.
+- **R-NOURISH-DEFAULT (off by default):** `nourishmentModeEnabled` defaults `false` for **everyone** and requires the intake pipeline **plus** a further explicit enrollment step. It is fully deletable (crypto-shred / row delete, `docs/07` §12.3).
+- **R-NOURISH-CONSENT (Art-9 explicit consent):** the anthropometric profile is **C2 special-category health data**; enrollment writes a `ConsentReceipt` with `lawfulBasis: 'explicit_consent'`, is encrypted at rest, syncs only as opaque ciphertext, and is **never** visible to a companion (§4.3 R-COERCE-3).
+- **R-NOURISH-TWOSIDED (adequacy, never a deficit):** Portion Balance is **two-sided by construction** — under-eating **never** raises it; it lowers it exactly like over-eating (`docs/10` §4.6, §5.3, §8.1). The band's shoulders are both finite, the max (100) is reachable **only** inside the comfortable range, and "eat as little as possible" scores near **zero**. "Minimize" is structurally impossible; the API surface has **no** `goalWeight`/`targetWeight`/`calorieBudget`/`deficit` field (`docs/10` §8.5 P-N4).
+- **R-NOURISH-CLAMP (targets clamp to healthy; no underweight optimization):** TDEE and every per-meal center are computed against a weight **clamped** to `max(weightKg, healthyLoKg)` (BMI ≥ 18.5), so the app never sets or optimizes toward an underweight target (`docs/10` §8.2). If a user's stats indicate `BMI < 18.5`, or they try to set an underweight/very-low-intake goal, the app does **not** build a reducing plan — it routes to the care pathway (below).
+- **R-NOURISH-CARE (concerning patterns route to support, never congratulation):** the `UNDERWEIGHT_STATS` trigger routes at enrollment; `SUSTAINED_EXTREME_LOW_INTAKE` (repeated below-band meals) and the intake-target extension of `EXTREME_LOW_BITE_TARGET` route sustained low intake / underweight-goal attempts (§3.7.2) into the gentle care/signpost ladder (§3.7.4). Nourishment Mode being on actually **lights up** signals that were dark by default (§3.7.3) — a net safety gain — while the passive help floor (§3.7.6) stays reachable for adults who declined enrollment because their stats were underweight.
+- **R-NOURISH-HUD (R-HUD-1 preserved):** there is **no** live decrementing/incrementing kcal, gram, or Adequacy readout at the table. Live coaching toward the band is a **3-state qualitative cue** only (`ROOM_TO_ENJOY_MORE` / `COMFORTABLE` / `AROUND_ENOUGH`, `docs/10` §6.1), pause-phase only, phrased as gentle invitations ("there's room to enjoy a little more", "you're in your comfortable range", "check in with how full you feel") — never a number, never "stop eating", never "over your limit". The Adequacy number is revealed **post-meal only**, as a ranged `Estimate` via `<EstimateValue>` (§5), never a bare "you ate X kcal".
+- **R-NOURISH-HIDE (one-tap hide, pipeline kill):** the app-wide `intakeNumbersHidden` selector (§3.2, `docs/07` §11.2) governs Portion Balance exactly as it governs grams — when numbers are hidden (default, one-tap hide, or any minor), no Adequacy number renders, no per-meal target is computed, and the composite returns to behavior-only.
+- **R-NOURISH-NOTMED (not medical advice):** every anthropometric and Adequacy surface carries the standing *"informational, rough estimate — not medical or nutritional advice, not a measurement"* caption (§5.5); BMI/TDEE are stated as population estimates, not a personal prescription. Any wording implying diagnosis/prescription fails clinician review (§3.7.7, §11.3).
+
+The behavior score (`@chewie/scoring`) is **unchanged**: it stays 100% intake-free, always-on, calm, and numberless at the table; the intake wall (`docs/05` §2) is untouched and a CI import rule forbids `@chewie/nourishment` from importing `scoreBehavior` (`docs/10` §10). The user-visible composite adds an Adequacy facet **only when Nourishment Mode is on**, assembled in the presentation layer outside `scoreBehavior()`, so property test P4 still holds.
+
 ---
 
 ## 4. Consent & surveillance ethics — camera + companion
@@ -468,7 +489,7 @@ interface Estimate<T> {
 
 ### 5.2 The component that refuses to lie
 
-The shared `<EstimateValue>` component (home: `docs/09-design-system.md` / the UI package) is the **only** approved way to render any `Estimate`:
+The shared `<EstimateValue>` component (home: `docs/03-chewing-engine-and-art.md` / the UI package) is the **only** approved way to render any `Estimate`:
 
 ```tsx
 function EstimateValue({ est }: { est: Estimate<number> }) {
@@ -504,7 +525,7 @@ Wherever any intake/nutrition estimate appears, a persistent, quiet line states 
 
 ## 6. Accessibility (WCAG 2.2 AA as the floor)
 
-Chewie's core UI is unusual — a full-screen colour that changes — which makes accessibility *more* central, not less. Target: **WCAG 2.2 Level AA**. Design tokens are owned by `docs/09-design-system.md`; the CI checks below run over those tokens.
+Chewie's core UI is unusual — a full-screen colour that changes — which makes accessibility *more* central, not less. Target: **WCAG 2.2 Level AA**. Design tokens are owned by `docs/03-chewing-engine-and-art.md`; the CI checks below run over those tokens.
 
 ### 6.1 Contrast (1.4.3 text, 1.4.11 non-text) — the soft-colour tension
 
@@ -628,6 +649,7 @@ type AgeBand = 'UNDER_16' | 'AGE_16_17' | 'ADULT' | 'UNDISCLOSED';
 | Numeric behavior score reveal | Off, gated | Off by default | Opt-in |
 | **Intake numbers / pipeline** | **Disabled, cannot enable** | Off; enabling needs extra friction + reaffirmed disclosure | Off; opt-in |
 | Nutrition "Balance & Variety" | **Disabled** | Off; opt-in with friction | Off; opt-in |
+| **Nourishment Mode / Portion Balance** (§3.8, `docs/10`) | **Disabled, cannot enable** | **Disabled, cannot enable** | Off; opt-in (adults-only) |
 | Cloud "second opinion" | **Disabled** | Off; opt-in | Off; opt-in |
 | **Companion (watch/pair)** | **Disabled or parent-gated** | Restricted; extra friction | Opt-in |
 | Care pathway | On (behavior-first), softer copy | On | On |
@@ -694,7 +716,7 @@ A shared family tablet on the kitchen stand, or partners taking turns, must not 
 | RT-10 | Bright screen shames/annoys at a shared table | Eater/bystander | Discreet Mode + face-down haptic-only | R-A11Y-DISCREET-* (§6.7) |
 | RT-11 | Camera captures bystanders / minors at the table | Bystander/minor | Off by default, on-device ephemeral, blur-before-any-upload, awareness prompt | R-CAM-* (§4.4) |
 | RT-12 | Minor pushed into calorie/comparison behaviors | Minor | Under-16 defaults: no numbers, no companion, softer copy | Defaults matrix (§7) |
-| RT-13 | Weight-loss diet flow bolted on later | Product/eng | No weight/BMI/goal columns; schema change requires review; diet lexicon banned | Schema absence + CI (§3.5) |
+| RT-13 | Weight-loss diet flow bolted on later | Product/eng | No goal/target/deficit/BMI columns anywhere; anthropometric inputs only in the reviewed, table-scoped `anthropometric_profile` (clinician-review id required); diet lexicon hard-banned | Table-scoped schema guard + CI (§3.5, §3.8, `docs/07` §12.4) |
 | RT-14 | Care/safeguard data leaks or becomes surveillance | Eater | Care state on-device only; never serialized; disable-able | Anti-exfil property test + boundary lint (§3.7.5) |
 | RT-15 | Care card false-positives shame a healthy user | Eater | Multi-signal + persistence + hysteresis + cooldown + "don't show again" | Heuristic design (`docs/05` §11) |
 | RT-16 | Comparison/leaderboards create social ED pressure | Eater | No feeds/leaderboards exist; self-vs-self only | Product non-goal (§3.6) |
@@ -705,6 +727,7 @@ A shared family tablet on the kitchen stand, or partners taking turns, must not 
 | RT-21 | Highest-risk user is invisible to detection (intake off / disengaged) | Eater | Honest limits stated; behavior-first signals; passive floor; DPIA line item | §3.7.3, §3.7.6, §11.3 |
 | RT-22 | Shared device blends a minor into adult defaults, or a minor switches into an adult profile | Minor | Per-profile age gate; no household aggregate; switch-into-adult friction (optional PIN, prompted when a minor profile exists); UNDISCLOSED = most-protective | R-PROFILE-* (§8) |
 | RT-23 | Meal lost / stranded `active` after crash, framed as failure | Eater | Calm resume-or-close copy; sleep-inclusive clock; reaper (owned `docs/03`) | R-ONB-4 (§9.4) |
+| RT-24 | Nourishment Mode / Portion Balance misused as a covert restriction or weight-loss tool (user tries to "minimize", chase an underweight target, or drive intake down) | Eater | **Two-sided band** (under-eating lowers Adequacy just like over-eating; max only at center, "minimize" scores ~0); **targets clamp to the healthy range** (TDEE from `max(weightKg, healthyLoKg)`, never below BMI 18.5); **no reduce API** (no goal/target/deficit field exists); `UNDERWEIGHT_STATS` + low-intake-target attempts route to the **care pathway**, never a smaller band; adults-only, off by default, hide-numbers; every weight-loss lexicon token still hard-banned | Two-sided property tests + clamp + no-reduce-API type assertion + care routing (§3.8, `docs/10` §8) |
 
 ---
 
@@ -717,7 +740,8 @@ This is the actionable deliverable. **Any doc, feature, or PR that touches scori
 - [ ] Does **not** create any surface where eating less raises a number. (P1/P2)
 - [ ] No live numeric HUD (grams/kcal/score/"remaining"). (R-HUD-1)
 - [ ] Intake/nutrition is off by default, hideable **and** pipeline-disable-able via the single selector. (R-HIDE-1..3)
-- [ ] No weight/BMI/calorie-budget/weight-loss framing in copy or schema. (R-FRAME-*)
+- [ ] No goal-weight/target/deficit/calorie-budget/weight-loss framing in copy or schema; any BMI/weight text appears **only** on an opt-in, adults-only, two-sided Nourishment Mode surface with clinician sign-off. (R-FRAME-*, R-NOURISH-*, §3.8)
+- [ ] If the feature touches Nourishment Mode: adequacy is **two-sided** (under-eating never raises it), targets **clamp** to the healthy range (no underweight optimization), there is **no** reduce/goal-weight/deficit API, and underweight-stats / low-intake attempts route to the care pathway. (R-NOURISH-TWOSIDED/CLAMP/CARE, `docs/10` §8)
 - [ ] Streaks freeze (never reset/shame); rest days first-class. (R-STREAK-*)
 - [ ] Comparison is self-vs-self only; no feeds/leaderboards introduced. (P10)
 - [ ] Any estimate uses the canonical `Estimate<T>` (`@chewie/core-types`) and renders via `<EstimateValue>`. (R-EST-*)
@@ -728,12 +752,12 @@ This is the actionable deliverable. **Any doc, feature, or PR that touches scori
 
 - [ ] `scoreBehavior` signature cannot receive grams/kcal/portion (compile-time).
 - [ ] Property: *reducing intake below the band never increases the score.*
-- [ ] Property: bands are **symmetric** — too-fast/too-slow and too-big/too-small both reduce score; center = 100.
+- [ ] Property: bands are **symmetric** — too-fast/too-slow both reduce score; center = 100. Bite *size* is **not** an absolute band (small bites are never penalized, `docs/05-scoring-model.md` §5.4); only bite *uniformity/rhythm* is scored, and symmetrically.
 - [ ] Property: baseline used by "battle yourself" is the eater's own adapting history, never a population/other-person value; safeguarded/unattended sessions are PB-ineligible.
 
 ### 11.3 Clinical & ethics review gate (blocking for any intake feature)
 
-- [ ] Every intake/nutrition/care-pathway feature reviewed and signed off by an ED clinician **before ship**; review id linked in the PR. (Phase 1 care pathway; Phase 2 intake; Phase 3 nutrition.)
+- [ ] Every intake/nutrition/care-pathway/**Nourishment Mode** feature reviewed and signed off by an ED clinician **before ship**; review id linked in the PR. (Phase 1 care pathway; Phase 2 intake; Phase 3 nutrition; Phase 3+ Nourishment Mode — its BMI thresholds, comfort margin, PAL factors, meal split, band shoulders, and the two-sided framing all sign-off-gated, `docs/10` §9.)
 - [ ] Any `reviewRequired` lexicon token (§3.5.1) carries a linked clinician approval.
 - [ ] Care-pathway copy is non-diagnostic, supportive, MDR-out-of-scope; resources verified & dated.
 - [ ] **Safeguard honest-limits are recorded as a DPIA line item** — "engagement-based detection cannot reach a disengaged restrictor" (§3.7.3), mirroring `docs/05` §11.2.
@@ -747,7 +771,8 @@ This is the actionable deliverable. **Any doc, feature, or PR that touches scori
 - [ ] `validate-cvd`: phase backgrounds distinguishable in luminance under 3 CVD sims (§6.2).
 - [ ] Dependency-cruiser: ring boundaries hold (ADR-0002) **and** companion/cloud serializers do **not** import the care module/types or intake. (§3.7.5)
 - [ ] Care anti-exfiltration property test passes (§3.7.5).
-- [ ] Schema check: no `weight/bmi/goal/targetCalories/deficit` columns (§3.5, `docs/07`).
+- [ ] Schema check (table-scoped): no `goal_weight/target_weight/weight_loss/bmi/calorie_budget/deficit` columns **anywhere**; `height_cm/weight_kg/age_years/activity` only in `anthropometric_profile` (with a linked clinician-review id) (§3.5, §3.8, `docs/07` §12.4).
+- [ ] Dependency-cruiser: `@chewie/nourishment` does **not** import `scoreBehavior` (the intake wall holds; no intake reaches the behavior scorer). (§3.8, `docs/10` §10)
 - [ ] Tip content: `reviewStatus === 'clinician-reviewed'` and reading-grade cap for every shipped tip (§12).
 - [ ] `docs:links`: every cross-reference and ADR id in this doc resolves against the canonical map + ADR index (finding-#4 gate). No timing/estimate/bite shape is re-declared here rather than cited.
 
@@ -810,12 +835,13 @@ interface TipEntry {
 
 ## 13. Rollout tie-in (what ships when)
 
-Mapped to the phase plan in `docs/00-architecture-spine.md` / `docs/01-product-vision.md`:
+Mapped to the phase plan in `docs/02-system-architecture.md` / `docs/01-product-vision.md`:
 
 - **Phase 0:** design tokens with no red/failure states (`docs/09`); `validate-palette` / `validate-cvd`; `lint-copy`; `no-bare-estimate`; dependency-cruiser boundary rules incl. care anti-import; scoring property-test harness (`docs/05`); care module skeleton with anti-exfil test; `docs:links` link-checker.
 - **Phase 1 (Calm Core MVP):** ships **with** the very first score → the hide-numbers switch, gentle-continuity streaks, redundant phase signalling, Discreet Mode, reduced-motion, screen-reader support, age gate + defaults matrix + shared-device fallback, first-run safety requirements (§9), tip content policy, and the care pathway (Levels 0–3 + passive floor, offline resource directory, clinician-reviewed). Safety is not deferred.
 - **Phase 2 (scale):** intake stays optional/ranged/hideable; band-based scoring property tests enforced; "battle yourself" self-vs-self.
 - **Phase 3 (camera):** Article-9 handling UX rules; Balance & Variety insight off-by-default with ranges; opt-in blurred single-frame cloud path; clinician review of every intake feature.
+- **Phase 3+ (Nourishment Mode, `docs/10`):** the opt-in, adults-only, two-sided Portion Balance plane behind the blocking ED-clinician gate and an updated DPIA (C2 anthropometric data); `anthropometric_profile` migration with its clinician-review id; the table-scoped schema guard and narrowed lexicon; two-sided property tests; clamp + care routing; qualitative live coaching (R-HUD-1 preserved) and post-meal ranged reveal. Does **not** alter the Phase-1/2 behavior-only core.
 - **Phase 4 (companion):** full consent/surveillance gate (§11.6); anti-coercion education; minors restricted.
 - **Phase 5:** DPIA finalization, ED-clinician design review of every intake feature and safeguard threshold, accessibility hardening, age-appropriateness hardening, store-review prep (camera/BLE/"another person watching" justifications, no medical claims).
 
@@ -831,7 +857,7 @@ Mapped to the phase plan in `docs/00-architecture-spine.md` / `docs/01-product-v
 4. **Should the numeric behavior score exist at all for adults,** or is even a post-meal number a subtle harm gradient? Default keeps it opt-in/off; revisit after user research with the clinician.
 5. **Companion for minors:** fully disabled vs. verifiable-parental-consent gate — depends on legal reading of GDPR/child-safety per member state.
 6. **Discreet Mode as default at the table?** The *calm* full-screen may itself be the wrong default in company; consider auto-suggesting Discreet Mode when a companion or camera is active.
-7. **Doc-set filename/number reconciliation (root cause of the cross-reference finding).** This doc is committed at `docs/08-responsible-design-and-safety.md`, but siblings reference it as `08-privacy-safeguards-and-onboarding.md` (`docs/04`) and `08-privacy-dpia.md` (`docs/05`), and forward docs (07/09) are not yet on disk. **The spine (`docs/00-architecture-spine.md`) must freeze one filename per slot and the `docs:links` CI job must go green before Phase 1.** Until then this is a known, tracked broken-link risk, not a silent divergence.
+7. **Doc-set filename/number reconciliation (root cause of the cross-reference finding).** This doc is committed at `docs/08-responsible-design-and-safety.md`, but siblings reference it as `08-privacy-safeguards-and-onboarding.md` (`docs/04`) and `08-privacy-dpia.md` (`docs/05`), and forward docs (07/09) are not yet on disk. **The spine (`docs/02-system-architecture.md`) must freeze one filename per slot and the `docs:links` CI job must go green before Phase 1.** Until then this is a known, tracked broken-link risk, not a silent divergence.
 8. **Profile-switch lock strength (§8, R-PROFILE-3):** is an optional per-adult-profile PIN sufficient friction to stop a minor switching into an adult profile on a shared tablet, or is a stronger (biometric / mandatory-when-minor-present) lock warranted? Needs a decision with `docs/07` before shared-device marketing; conservative default is PIN-optional-but-prompted-when-a-minor-profile-exists.
 
 **Honest risks** (this doc's residual risk after mitigations):

@@ -2,7 +2,7 @@
 
 > **Scope.** This document owns two Ring 1 ("Calm Core") subsystems: the real-time **Phase Engine** (`@chewie/engine`) and the **ChewArt** generative art system (`@chewie/art`). Both are pure, framework-agnostic TypeScript packages with no React and no network. They are the beating heart of the lovable offline product and must run in airplane mode forever.
 >
-> **Conformance.** Stack, naming, phases, and ethics follow `docs/00-architecture-spine.md`. This doc is also the **canonical owner** of three cross-cutting concerns the critique flagged as divergent across the doc set: (a) the drift-free **clock source of truth** (§2), (b) **in-progress session recovery after process death** (§2.6), and (c) the rule that **ChewArt reward channels are quantity-independent** (§11). Where sibling docs previously described these differently, they defer to this document.
+> **Conformance.** Stack, naming, phases, and ethics follow `docs/02-system-architecture.md`. This doc is also the **canonical owner** of three cross-cutting concerns the critique flagged as divergent across the doc set: (a) the drift-free **clock source of truth** (§2), (b) **in-progress session recovery after process death** (§2.6), and (c) the rule that **ChewArt reward channels are quantity-independent** (§11). Where sibling docs previously described these differently, they defer to this document.
 
 ### Canonical doc & path convention
 
@@ -12,14 +12,14 @@ All design docs live in `docs/` under a single `NN-name.md` scheme (this file is
 
 | File | What this doc relies on |
 |---|---|
-| `docs/00-architecture-spine.md` | Rings, stack, naming, ethical guardrails, phases. |
+| `docs/02-system-architecture.md` | Rings, stack, naming, ethical guardrails, phases. |
 | `docs/02-system-architecture.md` | App wiring, `@chewie/core-types` home of shared types. |
-| `docs/04-sensing-fusion.md` | `@chewie/fusion`, `SensorMode`, `BiteEvent`, behavior signals (Ring 2). We *consume* its outputs; we never import it. |
-| `docs/05-scoring-behavior.md` | `@chewie/scoring`, `BehaviorScore` (behavior-only, intake-blind), baseline/PB eligibility. |
-| `docs/06-companion-plane.md` | Ring 3 mirrors our `EngineSnapshot` over a DataChannel; companion teardown. |
-| `docs/07-data-model.md` | Encrypted SQLite schema (no weight/BMI/goal columns); persisted `TileSeed`, `MealSession`, and the **session checkpoint** shape (§2.6). |
-| `docs/08-onboarding-and-safeguards.md` | First-run flow, age-band capture, permission priming, empty states, disordered-use safeguard, single-profile decision. |
-| `docs/09-privacy-and-compliance.md` | DPIA, minor-safe defaults, Article 9 handling. |
+| `docs/04-sensing-and-ai.md` | `@chewie/fusion`, `SensorMode`, `BiteEvent`, behavior signals (Ring 2). We *consume* its outputs; we never import it. |
+| `docs/05-scoring-model.md` | `@chewie/scoring`, `BehaviorScore` (behavior-only, intake-blind), baseline/PB eligibility. |
+| `docs/06-companion-and-pairing.md` | Ring 3 mirrors our `EngineSnapshot` over a DataChannel; companion teardown. |
+| `docs/07-data-model-and-privacy.md` | Encrypted SQLite schema (no weight/BMI/goal columns); persisted `TileSeed`, `MealSession`, and the **session checkpoint** shape (§2.6). |
+| `docs/08-responsible-design-and-safety.md` | First-run flow, age-band capture, permission priming, empty states, disordered-use safeguard, single-profile decision. |
+| `docs/07-data-model-and-privacy.md` | DPIA, minor-safe defaults, Article 9 handling. |
 | `@chewie/config` | **Single source of truth for placeholder default timings/palettes** (§4). Schema defaults in `07` import from here; the engine imports from here; they cannot drift. |
 
 **ADRs referenced here:** `ADR-0010 — sleep-inclusive monotonic clock (ChewieClock)`, `ADR-0011 — deterministic seed+params ChewArt`. (See `docs/adr/README.md`.)

@@ -15,11 +15,11 @@ This repo uses a single flat, numbered convention: `docs/NN-name.md`, with ADRs 
 | doc 03 | `docs/03-chewing-engine-and-art.md` | `@chewie/engine`, `ChewieClock`, `@chewie/art`, **in-progress session recovery (owner)** |
 | doc 04 | `docs/04-sensing-and-ai.md` | `@chewie/fusion`, sensor drivers |
 | doc 05 | `docs/05-scoring-model.md` | `@chewie/scoring`, safeguard heuristics |
-| doc 06 | `docs/06-companion-plane.md` *(planned)* | Ring 3 / WebRTC / pairing UX |
+| doc 06 | `docs/06-companion-and-pairing.md` | Ring 3 / WebRTC / pairing UX |
 | **doc 07** | **`docs/07-data-model-and-privacy.md`** | **this doc** |
-| doc 08 | `docs/08-onboarding-and-consent.md` *(planned)* | **first-run flow owner**, age gate, intake-disclosure UX |
-| doc 09 | `docs/09-release-and-safety-defaults.md` *(planned)* | `RELEASE_DEFAULTS`, minor-safe defaults |
-| doc 10 | `docs/10-dpia.md` *(planned)* | mandatory DPIA |
+| doc 08 | `docs/08-responsible-design-and-safety.md` | **responsible-design & safety**: age gate, care pathway, R‑HUD‑1, banned lexicon, intake-disclosure UX |
+| doc 09 | `docs/09-roadmap-and-mvp.md` | roadmap, MVP phasing, release / minor-safe defaults |
+| doc 10 | `docs/10-nourishment-and-intake-targets.md` | **Nourishment Mode**: opt-in anthropometric profile, two-sided **Portion Balance** / Adequacy, `@chewie/nourishment` |
 | — | `docs/adr/README.md` | the single ADR index (all ADR numbers resolve here) |
 | — | `packages/config` | **single source of placeholder timings/defaults** (§7.1) |
 | — | `packages/core-types` | **single home of `Estimate<T>`, `BiteEvent`, `SensorMode`** (§5) |
@@ -40,7 +40,7 @@ This document owns **every byte Chewie persists or transmits**: the schema, wher
 
 1. **Local-first, always.** The Calm Core (Ring 1) reads/writes only the on-device SQLite DB. Zero rows are required in the cloud for the core loop. Airplane mode forever is a supported configuration.
 2. **The cloud never sees plaintext eating data.** When sync is enabled, the server stores **opaque ciphertext** (client-side E2E encrypted) plus a thin layer of non-sensitive routing metadata. The operator, a subpoena, or a breach yields ciphertext only.
-3. **Ethics enforced by schema *shape*, not by disclaimers.** There are **no `weight`, `bmi`, `goal`, `target_weight`, `calorie_budget` columns anywhere** — a weight-loss flow cannot be built without a schema migration that CI blocks (§12.4). The primary score table structurally cannot hold grams/calories.
+3. **Ethics enforced by schema *shape*, not by disclaimers.** There is **no `goal`, `target_weight`, `weight_goal`, `calorie_budget`, `deficit`, or `bmi` column anywhere** — a weight‑*loss* flow cannot be built without a schema migration that CI blocks (§12.4), and the primary **behavior** score table structurally cannot hold grams/calories. Current height/weight/age/sex/activity live in exactly **one** place: the opt‑in, adults‑only, off‑by‑default **Nourishment** health module (`anthropometric_profile`, §6.6) — a C2 / Art 9 table that is **empty for everyone until *Nourishment Mode* is explicitly enabled**, and that stores a healthy **range** plus a two‑sided per‑meal target, *never* a single "goal weight," calorie budget, or deficit. BMI, the WHO healthy range, and TDEE are **derived at runtime and never persisted**. This converts the earlier *prohibition* into a guarded feature — see `docs/10-nourishment-and-intake-targets.md` and the **table‑scoped** CI guard (§12.4).
 4. **Intake is off *and* hidden by default — for everyone.** Intake computation and intake numbers are two separate, explicit opt-ins (§11.2). Enabling the scale for *behavior* purposes never surfaces grams/pace. Hidden-by-default is the persisted default for adults and minors alike.
 5. **Data minimisation by construction.** We store coarse age *bands*, not birth dates; derived `BiteEvent`s, not raw high-frequency sensor streams (by default); seeds+params, not rendered images.
 6. **Camera imagery is the most sensitive asset and is never persisted.** Frames live in a VisionCamera worklet as in-memory `Uint8Array`s and are discarded per frame. No repository, sync path, or export can reach them (§10).
@@ -56,13 +56,14 @@ Every field maps to exactly one class. The class dictates: *may it be persisted?
 |---|---|---|---|---|---|---|
 | **C0 – Non-personal** | app version, `algoVersion`, `scoringVersion` | yes | yes (plaintext meta ok) | yes | n/a | none |
 | **C1 – Personal** | profile id, locale, settings, session timing, `ChewArt` tiles, `BehaviorScore`, continuity/streaks, session checkpoint | yes | yes (ciphertext) | only encrypted | live `BehaviorScore`/phase over ephemeral channel only | Art 6 |
-| **C2 – Health / special (Art 9)** | `MealEstimate` (grams, pace, nutrition), `WeightSample`, food labels, `BalanceInsight`, `SafeguardEvent` | yes (SafeguardEvent local-only) | yes **except SafeguardEvent (never syncs)** | only encrypted; **never** for SafeguardEvent | **never** the numbers; **never** SafeguardEvent | **Art 9** — explicit consent |
+| **C2 – Health / special (Art 9)** | `MealEstimate` (grams, pace, nutrition), `WeightSample`, food labels, `BalanceInsight`, `AnthropometricProfile`/`MealSplitPrefs` (Nourishment Mode, §6.6), `SafeguardEvent` | yes (SafeguardEvent local-only) | yes **except SafeguardEvent (never syncs)** | only encrypted; **never** for SafeguardEvent | **never** the numbers; **never** SafeguardEvent; **never** the anthropometric profile | **Art 9** — explicit consent |
 | **C3 – Imagery / biometric (Art 9, highest)** | camera frames, live video, hand/pose landmarks | **never persisted** | **never** | only ephemeral P2P stream w/ consent, or one blurred still w/ explicit consent | live video only, ephemeral, not recorded | **Art 9** — explicit consent, DPIA |
 
 Rules of thumb baked into the code:
 - **C3 never touches the persistence layer.** Enforced by an architectural boundary: `@chewie/fusion` frame processors return only C2 aggregates (`chewCount`, a `gramsDelta` step), never a frame.
 - **SafeguardEvent (disordered-use heuristic output) is C2 but pinned local-only** — excluded from the sync outbox and from any companion/cloud path, so the safeguard cannot itself become a surveillance vector.
 - **Intake C2 numbers are gated by a derived `intakeNumbersHidden` selector** (§11.2) whose default resolves to *hidden* for everyone.
+- **The `AnthropometricProfile` (height/weight/age/sex/activity) is gated by a *further* opt‑in, `nourishmentModeEnabled`** (§6.1, §6.6) — adults‑only, off by default, and subject to the same `intakeNumbersHidden` fail‑safe (hide numbers ⇒ no Adequacy score, no per‑meal target computed). The row is **absent for everyone** until Nourishment Mode is explicitly enabled, and BMI/healthy‑range/TDEE are derived at runtime, never stored.
 
 ---
 
@@ -124,7 +125,7 @@ stateDiagram-v2
     T1_LocalOnly --> [*]: delete everything (crypto-shred + purge)
 ```
 
-> **Intake disclosure is orthogonal to these transport tiers.** Turning on *intake computation* and *intake numbers* (§11.2) is a separate, explicit, local opt-in that is **not** implied by enabling sensing, the scale, sync, or the companion. A person can run the scale for behavior/pace-band coaching forever and never see a gram.
+> **Intake disclosure is orthogonal to these transport tiers.** Turning on *intake computation* and *intake numbers* (§11.2) is a separate, explicit, local opt-in that is **not** implied by enabling sensing, the scale, sync, or the companion. A person can run the scale for behavior/pace-band coaching forever and never see a gram. **Nourishment Mode** (§6.6) is a *further*, stricter local opt‑in still — adults‑only, requiring intake to be on **plus** its own Art‑9 consent receipt — and is likewise orthogonal to the transport tiers.
 
 | Tier | What it turns on | Data that leaves the device | Lawful basis |
 |---|---|---|---|
@@ -250,6 +251,10 @@ export interface Settings {
   cloudSyncEnabled: boolean;      // Tier 2
   cloudAiSecondOpinion: boolean;  // Tier 4, default false
   safeguardsEnabled: boolean;     // default true; user-disableable (anti-surveillance)
+  // --- Nourishment Mode gate (§6.6, docs/10) — a THIRD opt-in beyond pipeline + disclosure ---
+  nourishmentModeEnabled: boolean; // default FALSE for everyone. Enabling REQUIRES ageBand==='ADULT'
+                                   //   AND intakePipelineEnabled===true AND an Art-9 consent receipt.
+                                   //   Governs whether an anthropometric_profile row may exist at all.
   // per-FIELD causality → per-field LWW so unrelated edits never clobber (§9)
   _clocks: Record<string, HlcString>;
   updatedHlc: HlcString;
@@ -399,12 +404,15 @@ export interface PairingGrant {             // C1 metadata — lives in CLOUD; o
 export type SafeguardSignal =
   // default-available (work in behavior-only calm mode, no intake needed):
   | 'OBSESSIVE_NUMBER_TOGGLING'   // repeatedly enabling/disabling intake disclosure
-  | 'EXTREME_SELF_SET_TARGET'     // extreme bite target / chew or pause timings set by the user
+  | 'EXTREME_LOW_BITE_TARGET'     // extreme self-set targets: bite target, chew/pause timings, and (Nourishment Mode) an extreme-low per-meal intake target — care routing per docs/10-nourishment-and-intake-targets.md §8.3
   | 'SESSION_SHAPE_ANOMALY'       // e.g. abnormally many ultra-short sessions
   // intake-gated (ONLY available when intakePipelineEnabled — see §6.5.1):
-  | 'SUSTAINED_LOW_INTAKE'
+  | 'SUSTAINED_EXTREME_LOW_INTAKE'
   | 'SKIPPED_MEAL_PATTERN'
-  | 'BITE_SIZE_RESTRICTION';
+  | 'BITE_SIZE_RESTRICTION'
+  // Nourishment-Mode-gated (ONLY when nourishmentModeEnabled): routes to gentle care, never
+  //   congratulation (docs/08 §3.7, docs/10 §8.3). Being on LIGHTS UP a signal that is dark by default.
+  | 'UNDERWEIGHT_STATS';           // anthropometric stats indicate BMI < 18.5 → NO reducing target is ever built
 
 export interface SafeguardEvent {           // C2 — LOCAL-ONLY, never synced, never to companion
   id: Uuid; profileId: Uuid;
@@ -426,10 +434,59 @@ export interface SyncOutboxRow {
 
 The care pathway (owned by doc 05) must not be presented as more protective than it structurally can be. Stated at the data level:
 
-- **The intake-gated signals (`SUSTAINED_LOW_INTAKE`, `SKIPPED_MEAL_PATTERN`, `BITE_SIZE_RESTRICTION`) only fire when `intakePipelineEnabled === true`.** With intake off (the default for everyone), `MealEstimate`/`WeightSample`-derived signals have no data to run on. `requiresIntakePipeline` on the event records this explicitly.
+- **The intake-gated signals (`SUSTAINED_EXTREME_LOW_INTAKE`, `SKIPPED_MEAL_PATTERN`, `BITE_SIZE_RESTRICTION`) only fire when `intakePipelineEnabled === true`.** With intake off (the default for everyone), `MealEstimate`/`WeightSample`-derived signals have no data to run on. `requiresIntakePipeline` on the event records this explicitly.
 - **All signals are engagement-based.** They can only observe a person who keeps opening the app. **The users at highest ED risk are precisely those who keep intake off, or who stop opening the app entirely — for them the strongest signals are dark by construction.**
-- **Therefore the default-mode heuristic leans on the usage/behavior signals that always exist** (`OBSESSIVE_NUMBER_TOGGLING`, `EXTREME_SELF_SET_TARGET`, `SESSION_SHAPE_ANOMALY`), and the app never implies it can detect restriction it cannot see.
-- **This limitation is a required section of the DPIA and the ED-clinician review** (doc 10, doc 05): engagement-based detection cannot reach a disengaged restrictor, and the product must not market the safeguard as a safety net that catches everyone.
+- **Therefore the default-mode heuristic leans on the usage/behavior signals that always exist** (`OBSESSIVE_NUMBER_TOGGLING`, `EXTREME_LOW_BITE_TARGET`, `SESSION_SHAPE_ANOMALY`), and the app never implies it can detect restriction it cannot see.
+- **This limitation is a required section of the DPIA (§13.4) and the ED-clinician review** (`docs/08-responsible-design-and-safety.md`, `docs/05-scoring-model.md`): engagement-based detection cannot reach a disengaged restrictor, and the product must not market the safeguard as a safety net that catches everyone.
+
+### 6.6 Nourishment Mode — the opt‑in anthropometric health module (C2, Art 9)
+
+> **New in this reconciliation.** *Nourishment Mode* (`docs/10-nourishment-and-intake-targets.md`) is an **opt‑in, adults‑only, off‑by‑default, fully hideable** feature that lets an adult enter height/weight/age/sex/activity, from which the app **derives at runtime** BMI, the WHO healthy‑weight *range*, TDEE (Mifflin–St Jeor × activity), and a **two‑sided per‑meal target band** — the *Portion Balance* / *Adequacy* score. It converts the v2 *prohibition* on weight/BMI features into a **guarded** feature: the target is **two‑sided** (both under‑ and over‑eating lower the score — "minimize" is impossible), **clamped** to the healthy range (never an underweight target — an underweight input routes to the gentle care pathway, `docs/08` §3.7), and the **behavior score plane is untouched** (grams still cannot reach `scoreBehavior()`). This doc owns only the *persisted shape* of its two rows; the maths, safeguards, and `@chewie/nourishment` package live in `docs/10`.
+
+The module persists **inputs only**. Everything a diet app would fixate on — BMI, a goal weight, a calorie budget, a deficit — is **derived at runtime and never written** (§12.4 guard). Two rows exist, and **only** when `Settings.nourishmentModeEnabled === true` and `ageBand === 'ADULT'`:
+
+```ts
+// packages/core-types/src/health/anthropometric.ts
+// C2 (GDPR Art 9). Opt-in health module. Written ONLY when nourishmentModeEnabled === true
+//   AND ageBand === 'ADULT'. Absent/empty for everyone else. Syncs only as opaque ciphertext.
+export type BiologicalSex = 'MALE' | 'FEMALE';   // used ONLY for the BMR constant (docs/10 §4.3); self-selected
+
+export type ActivityLevel =
+  | 'SEDENTARY'      // little/no exercise         → PAL 1.20
+  | 'LIGHT'          // light exercise 1–3 d/wk    → PAL 1.375
+  | 'MODERATE'       // moderate 3–5 d/wk          → PAL 1.55
+  | 'ACTIVE'         // hard exercise 6–7 d/wk     → PAL 1.725
+  | 'VERY_ACTIVE';   // very hard / physical job   → PAL 1.90
+
+export interface AnthropometricProfile {          // C2 — encrypted, local-first, opt-in, adults-only
+  profileId: Uuid;                                // one row per LocalProfile (FK → profiles.id)
+  heightCm: number;                               // input
+  weightKg: number;                               // input — CURRENT weight; NOT a goal, NOT a target
+  ageYears: number;                               // input (BMR needs actual years, not the coarse AgeBand)
+  sex: BiologicalSex;                             // input (BMR constant only)
+  activity: ActivityLevel;                        // input
+  updatedHlc: HlcString;                          // LWW-row on merge (syncs as ciphertext)
+  deleted: boolean;                               // tombstone; independently deletable (crypto-shred)
+  // DELIBERATELY ABSENT: targetWeight, goalWeight, weightLoss, calorieBudget, deficit,
+  //   bmi (all DERIVED at runtime — never a column; §12.4 bans them EVERYWHERE, this table included).
+}
+
+// Per-meal split preferences — the persisted "IntakeTarget" configuration. The actual per-meal
+//   energy band is DERIVED at runtime from TDEE × fractions ± comfortMargin (docs/10 §4.5–§4.6),
+//   two-sided, and clamped to the healthy range; it is never persisted.
+export interface MealSplitPrefs {                 // C2 — encrypted, opt-in
+  profileId: Uuid;
+  fractions: Record<MealSlot, number>;            // must sum to 1; defaults in docs/10 §4.5
+  comfortMarginPct: number;                        // plateau half-width, default 0.15 (two-sided band)
+  updatedHlc: HlcString;
+  deleted: boolean;
+}
+export type MealSlot = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+```
+
+> **Why store `ageYears` (not just the coarse `AgeBand`)?** Mifflin–St Jeor is sensitive to age in years. `ageYears` is C2 data confined to this opt‑in module, **never** used for gating (gating still uses `LocalProfile.ageBand`, §11.3), deletable independently, and never leaves the device except as ciphertext.
+
+**Sync & merge class.** Both rows are **LWW‑row** entities (§9.2): they carry `updatedHlc`/`deleted`, sync **only as opaque ciphertext** inside `sync_documents` (entity_type `'anthropometric'` / `'meal_split_prefs'`) when the user has enabled cloud backup (T2), are included in the subject's **own** DSAR export (§13.2), and are **never** companion‑visible (§14). Disabling Nourishment Mode drops the derivation and the rows may be deleted independently (row delete / crypto‑shred, §12.3). The DDL lives in §7.2.
 
 ---
 
@@ -479,6 +536,7 @@ CREATE TABLE settings (
   cloud_sync_enabled      INTEGER NOT NULL DEFAULT 0,
   cloud_ai_second_opinion INTEGER NOT NULL DEFAULT 0,
   safeguards_enabled      INTEGER NOT NULL DEFAULT 1,
+  nourishment_mode_enabled INTEGER NOT NULL DEFAULT 0,   -- §6.6; adults-only, off by default (Phase 3+)
   field_clocks            TEXT    NOT NULL DEFAULT '{}',   -- JSON: field -> HlcString
   updated_hlc             TEXT    NOT NULL
 );
@@ -572,6 +630,36 @@ CREATE TABLE sync_outbox (
 
 **MMKV vs SQLite:** the `settings` row in SQLite is the durable, syncable, exportable source of truth. A write-through mirror keeps a copy in **MMKV** for synchronous, render-time reads of the hot feature flags and the derived `intakeNumbersHidden` selector (so the UI thread never awaits SQLite to know whether to render a number or a phase colour), plus the `ActiveProfilePointer` and a mirror of `session_checkpoint` for a fast cold-start resume check. **Zustand** holds only ephemeral, never-persisted session/UI state.
 
+### 7.2 Nourishment Mode tables (opt‑in, adults‑only, Phase 3+ migration)
+
+Shipped in a **separate, reviewed migration** (`0NN_nourishment.sql`) behind `nourishment_mode_enabled`. Both tables are **C2**, SQLCipher‑encrypted at rest like every local row, **empty until enrollment**, and the migration PR must carry a linked **ED‑clinician review id** (§12.4). They hold **inputs only** — BMI, the WHO healthy range, TDEE, and the two‑sided per‑meal band are **derived at runtime and never stored** (docs/10 §4). There is deliberately no `target_weight`, `goal_weight`, `calorie_budget`, `deficit`, or `bmi` column here or anywhere.
+
+```sql
+-- 0NN_nourishment.sql  (op-sqlite + SQLCipher; C2, encrypted at rest)
+CREATE TABLE anthropometric_profile (        -- C2 health module; one row per profile, opt-in, adults-only
+  profile_id   TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  height_cm    REAL NOT NULL,
+  weight_kg    REAL NOT NULL,                 -- CURRENT weight (an input), never a goal/target
+  age_years    INTEGER NOT NULL,
+  sex          TEXT NOT NULL,                 -- 'MALE' | 'FEMALE' (BMR constant only)
+  activity     TEXT NOT NULL,                 -- ActivityLevel
+  updated_hlc  TEXT NOT NULL,
+  deleted      INTEGER NOT NULL DEFAULT 0     -- tombstone; independently crypto-shreddable
+  -- INTENTIONALLY ABSENT: bmi (derived at runtime), target_weight, goal_weight,
+  --   weight_loss, calorie_budget, deficit. These remain un-buildable EVERYWHERE (§12.4).
+);
+
+CREATE TABLE meal_split_prefs (              -- C2; the persisted per-meal target configuration
+  profile_id         TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  fractions_json     TEXT NOT NULL,           -- JSON Record<MealSlot, number>, Σ = 1
+  comfort_margin_pct REAL NOT NULL DEFAULT 0.15,  -- two-sided band half-width (plateau)
+  updated_hlc        TEXT NOT NULL,
+  deleted            INTEGER NOT NULL DEFAULT 0
+);
+```
+
+**RLS / cloud representation.** These rows never get a plaintext Postgres table. When cloud backup (T2) is on they sync **only** as opaque ciphertext inside `sync_documents` (§8), governed by the existing **owner‑only** RLS policy (`sync_owner_all`, §14) — so the server, a subpoena, or a companion sees ciphertext at most, and a companion sees nothing at all (§14). Deleting Nourishment Mode is an O(1) row delete / crypto‑shred (§12.3).
+
 ---
 
 ## 8. Cloud plane — Postgres schema (Supabase, EU)
@@ -591,7 +679,7 @@ create table public.cloud_profiles (
 create table public.sync_documents (
   id                uuid not null,             -- entity UUIDv7
   owner             uuid not null references auth.users(id) on delete cascade,
-  entity_type       text not null,             -- 'session'|'tile'|'settings'|'estimate'|...
+  entity_type       text not null,             -- 'session'|'tile'|'settings'|'estimate'|'anthropometric'|'meal_split_prefs'|...
   hlc               text not null,             -- causality token, OPAQUE to server
   schema_version    int  not null,
   ciphertext        bytea not null,            -- XChaCha20-Poly1305(plaintext, DEK)
@@ -634,7 +722,7 @@ create table public.signaling (
 );
 ```
 
-There is deliberately **no** table for camera frames, no table for meal video, no plaintext intake table, and no server-side recording path.
+There is deliberately **no** table for camera frames, no table for meal video, no plaintext intake table, and no server-side recording path. The Nourishment Mode **`anthropometric_profile`/`meal_split_prefs`** (§6.6) likewise have **no plaintext Postgres representation**: they sync solely as opaque `sync_documents` ciphertext (entity_type `'anthropometric'`/`'meal_split_prefs'`) under the owner‑only policy, so the server never sees a height, weight, BMI, or target — and no companion can reach them (§14).
 
 ---
 
@@ -655,7 +743,7 @@ This matches the spine's "recommend, keep it simple" and its repository-seam not
 | Merge class | Entities | Merge rule |
 |---|---|---|
 | **LWW register (per field)** | settings, baseline, continuity | for each field, keep the value whose per-field `HlcString` is greatest |
-| **LWW row** | sessions, meal_estimates, behavior_scores, balance_insights | keep the row whose `updatedHlc` is greatest; `deleted=true` is just a value that wins by HLC |
+| **LWW row** | sessions, meal_estimates, behavior_scores, balance_insights, anthropometric_profile, meal_split_prefs | keep the row whose `updatedHlc` is greatest; `deleted=true` is just a value that wins by HLC |
 | **Insert-only log (union)** | bite_events, chewart_tiles, consent_receipts | union by `id`; never updated; on session tombstone they cascade |
 | **Device-local, never syncs** | weight_samples (default), safeguard_events, session_checkpoint, C3 frames | excluded from outbox entirely |
 
@@ -849,7 +937,23 @@ A full server compromise or lawful-access demand yields: routing metadata (`owne
 
 ### 12.4 CI guards — banned columns, timing drift, score isolation
 Three build-failing tests protect the structural guarantees:
-1. **Banned columns.** A Vitest test parses the Drizzle schema + all migrations and fails the build if any identifier matches the banned diet/body-weight set: `/\b(bodyweight|body_weight|bmi|weight_goal|target_weight|weight_loss|calorie_budget)\b/i`. (Food *mass* `grams`/`gramsDelta` is permitted — it is C2 intake, gated — but *body* weight, BMI, and diet goals have no representation anywhere.)
+1. **Banned columns (table‑scoped).** A Vitest test parses the Drizzle schema + all migrations and enforces **two** rules — reconciling the structural ethics guarantee with the opt‑in Nourishment health module (§6.6, `docs/10-nourishment-and-intake-targets.md`) so a weight‑*loss* flow still cannot be built casually:
+   - **Diet/goal tokens stay hard‑banned in *every* table, including `anthropometric_profile`:** `/\b(bodyweight|body_weight|bmi|weight_goal|goal_weight|target_weight|weight_loss|calorie_budget|deficit)\b/i`. There is **no** persisted goal weight, calorie budget, deficit, or BMI anywhere — BMI, the WHO healthy range, and TDEE are computed at runtime and never stored.
+   - **The anthropometric inputs `height_cm`/`weight_kg`/`age_years`/`activity` are permitted *only* in `anthropometric_profile`** (allow‑listed by table name); the same identifiers in any other table fail the build (so a `sessions.weight_kg` or a generic `goals` table remains impossible). That migration additionally requires a linked **ED‑clinician review id** on its PR (same mechanism as the `reviewRequired` lexicon in `docs/08-responsible-design-and-safety.md`).
+   - Food *mass* `grams`/`gramsDelta` is still permitted — it is C2 intake, gated — but *body* weight lives **only** in the reviewed, opt‑in health module, and diet goals/BMI have no representation anywhere.
+
+   ```ts
+   // scripts/lint-schema.ts (amended) — pseudocode
+   const DIET_GOAL_TOKENS = /\b(bodyweight|body_weight|bmi|weight_goal|goal_weight|target_weight|weight_loss|calorie_budget|deficit)\b/i;
+   const ANTHRO_TOKENS    = /\b(height_cm|weight_kg|age_years|sex|activity)\b/i;
+   const ANTHRO_ALLOWED_TABLE = 'anthropometric_profile';
+   for (const col of parseAllColumns(schemaAndMigrations)) {
+     if (DIET_GOAL_TOKENS.test(col.name)) fail(`banned diet/goal column: ${col.table}.${col.name}`);
+     if (ANTHRO_TOKENS.test(col.name) && col.table !== ANTHRO_ALLOWED_TABLE)
+       fail(`anthropometric column outside the reviewed health module: ${col.table}.${col.name}`);
+   }
+   // + assert the anthropometric_profile migration PR carries a clinicianReviewId.
+   ```
 2. **Default drift.** A test asserts every timing/colour default in the generated schema equals its `packages/config` source (§7.1), so schema and engine defaults cannot diverge.
 3. **Score isolation.** A property-based test in `@chewie/scoring` asserts `scoreBehavior()`'s type cannot receive grams/calories and that reducing intake never raises the score.
 
@@ -864,6 +968,7 @@ Three build-failing tests protect the structural guarantees:
 | Activity | Personal data | Lawful basis |
 |---|---|---|
 | On-device calm core (T1) | C1/C2 on device | processing on user's own device; consent for any special-category inference feature the user enables |
+| **Nourishment Mode** — anthropometric profile + Adequacy (opt‑in, adults‑only, §6.6) | C2 anthropometric inputs on device (ciphertext if backed up) | **Art 9(2)(a) explicit consent** (`purposes: ['nourishment_adequacy']`) |
 | Encrypted backup/sync (T2) | ciphertext of C1/C2 | Art 6(1)(a) consent + **Art 9(2)(a) explicit consent** |
 | Companion pairing + signaling (T3) | pairing metadata (C1) | Art 6(1)(a) consent |
 | Companion live video (T3) | ephemeral C3 | **Art 9(2)(a) explicit consent** |
@@ -875,7 +980,7 @@ We **do not** rely on legitimate interest for any special-category (Art 9) data.
 ### 13.2 Data-subject rights
 
 - **Access / Portability (DSAR export):** on-device, decrypt-and-emit a versioned JSON bundle (below) — no server round-trip needed. Includes the full `consent_receipts` ledger. **Excludes** `safeguard_events` from any companion-facing export by design; the subject's own export includes them.
-- **Erasure:** crypto-shred (§12.3) + purge `sync_documents`/`key_bundles`/`pairing_grants` for the user + local DB drop. Anonymous auth user deleted (cascades). On a multi-profile device, erasure is scoped per profile unless "delete everything" is chosen.
+- **Erasure:** crypto-shred (§12.3) + purge `sync_documents`/`key_bundles`/`pairing_grants` for the user + local DB drop. Anonymous auth user deleted (cascades). The Nourishment Mode `anthropometric_profile`/`meal_split_prefs` (§6.6) are also independently erasable at any time (row delete / crypto‑shred) without deleting anything else. On a multi-profile device, erasure is scoped per profile unless "delete everything" is chosen.
 - **Rectification:** edit locally; re-sync propagates via HLC LWW.
 - **Restriction / objection:** withdraw the relevant consent tier (§4); teardown runs before the `WITHDRAW` receipt.
 
@@ -892,6 +997,8 @@ We **do not** rely on legitimate interest for any special-category (Art 9) data.
   "behaviorScores": [ /* behaviour components only */ ],
   "mealEstimates": [ /* Estimate<T> ranges */ ],
   "balanceInsights": [ /* qualitative */ ],
+  "anthropometricProfile": { /* Nourishment Mode inputs: height/weight/age/sex/activity — subject's OWN export only, never companion-facing; BMI/healthy-range/TDEE are derived, not stored */ },
+  "mealSplitPrefs": { /* per-meal split fractions + comfort margin */ },
   "baselines": [ /* self-vs-self behaviour stats */ ],
   "continuity": { /* streak/rest-day state, civil-date based */ },
   "consentReceipts": [ /* full ledger — proof of lawful basis */ ],
@@ -909,6 +1016,7 @@ We **do not** rely on legitimate interest for any special-category (Art 9) data.
 | Raw `weight_samples` (C2) | local; **pruned to `BiteEvents` on session finalize** (default); not synced |
 | `session_checkpoint` (C1, local) | overwritten during a meal; **cleared on session finalize/abandon**; never synced |
 | Sessions / tiles / scores (C1) | until user deletes; encrypted backup while T2 on |
+| `anthropometric_profile` / `meal_split_prefs` (C2, Nourishment Mode) | local, encrypted; until the user deletes them or disables Nourishment Mode (row delete / crypto‑shred); ciphertext‑only backup while T2 on; **never** companion‑visible |
 | `signaling` (SDP/ICE) | TTL minutes; cron-purged |
 | `pairing_grants` | until revoked/expired; hard-deleted on erasure |
 | `safeguard_events` (C2, local) | rolling 30-day window; never synced/exported to companion |
@@ -916,7 +1024,7 @@ We **do not** rely on legitimate interest for any special-category (Art 9) data.
 | Crash reports (opt-in) | per Sentry policy; scrubbed |
 
 ### 13.4 Consent receipts & DPIA
-Every GRANT/WITHDRAW writes an immutable `ConsentReceipt` capturing `policyVersion`, enumerated `purposes`, and `lawfulBasis` — our auditable proof of valid consent. A **DPIA is mandatory** before any intake or camera feature ships (see doc 10); an ED clinician reviews every intake feature (spine risk register), and the DPIA must state the safeguard's honest limits from §6.5.1. No feature reaches production without its DPIA section and clinician sign-off.
+Every GRANT/WITHDRAW writes an immutable `ConsentReceipt` capturing `policyVersion`, enumerated `purposes`, and `lawfulBasis` — our auditable proof of valid consent. Enrolling in **Nourishment Mode** (§6.6) writes a receipt with `lawfulBasis: 'explicit_consent'` and `purposes: ['nourishment_adequacy']`. A **DPIA is mandatory** before any intake, camera, **or Nourishment Mode** feature ships; this doc maintains the data‑model DPIA section (§13.1–§13.3), **updated for the new C2 anthropometric data**. An ED clinician reviews every intake feature and the two‑sided/clamped Nourishment maths (`docs/10-nourishment-and-intake-targets.md`, `docs/08-responsible-design-and-safety.md` §11.3, the spine risk register), and the DPIA must state the safeguard's honest limits from §6.5.1. No feature reaches production without its DPIA section and clinician sign-off.
 
 ---
 
@@ -977,7 +1085,7 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 ```
 
-**What a companion can never reach:** `sync_documents` (owner-only, and ciphertext regardless), `key_bundles`, historical `sessions`/`bite_events`/`meal_estimates` (those are only in the eater's local DB / encrypted backup — they have no readable cloud representation at all). The companion sees only the **ephemeral live** `BehaviorScore`/phase/tip over the DataChannel, and live video — never stored numbers, never intake, never history.
+**What a companion can never reach:** `sync_documents` (owner-only, and ciphertext regardless), `key_bundles`, historical `sessions`/`bite_events`/`meal_estimates`, and the **Nourishment Mode `anthropometric_profile`/`meal_split_prefs`** (§6.6) — all of which live only in the eater's local DB / encrypted backup and have **no readable cloud representation at all** (they sync solely as opaque `sync_documents` ciphertext under the owner‑only policy above). The companion sees only the **ephemeral live** `BehaviorScore`/phase/tip over the DataChannel, and live video — never stored numbers, never intake, never the anthropometric profile, never Adequacy, never history.
 
 ---
 

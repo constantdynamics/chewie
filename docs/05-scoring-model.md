@@ -7,27 +7,30 @@
 
 **This doc owns:** the 1–100 behavior score math, sub-score curves, weighting/compositing, the "battle yourself" baseline, live-coaching decision logic, the **on-device disordered-use safeguard (incl. its honest detection limits, §11.2)**, the optional Balance & Variety insight *contract*, and the anti-gaming / anti-ED guarantees with their executable property tests.
 
-> **Conformance.** Stack, naming, phases, and ethics follow `docs/00-architecture-spine.md`. This doc conforms to the single doc-numbering and ADR scheme committed there and mirrored in `docs/02-system-architecture.md` §5. All sibling references below use that scheme; a CI link-checker over `docs/` fails the build on any dangling cross-reference.
+> **Not owned here:** the opt-in **Portion Balance** / *Adequacy* score and **Nourishment Mode** (the anthropometric profile, the two-sided per-meal intake band, the clamp/care guardrails) live in a **separate package** — `@chewie/nourishment` — and are specified in full in `docs/10-nourishment-and-intake-targets.md`. This doc's job toward that plane is narrow and unchanged: keep the behavior score **100 % intake-free** (the intake wall, §2), and expose the pure `bandScore` primitive (§4, §19) that the adequacy plane reuses — two-sided — without ever calling `scoreBehavior()`.
+
+> **Conformance.** Stack, naming, phases, and ethics follow `docs/02-system-architecture.md`. This doc conforms to the single doc-numbering and ADR scheme committed there and mirrored in `docs/02-system-architecture.md` §5. All sibling references below use that scheme; a CI link-checker over `docs/` fails the build on any dangling cross-reference.
 
 ### Related docs (referenced, never duplicated)
 
 | Path | What this doc borrows from it |
 | --- | --- |
-| `docs/00-architecture-spine.md` | Canonical spine; ADR index pointer; CI link-check policy. |
+| `docs/02-system-architecture.md` | Canonical spine; ADR index pointer; CI link-check policy. |
 | `docs/01-product-vision.md` | **First-run/onboarding-flow owner** (age-gate-first, permission priming, first-meal guidance) and app-wide empty states. This doc owns only the *scoring* empty states (warmup, no-signal). |
 | `docs/02-system-architecture.md` | `@chewie/core-types` — the ONE home of `BiteEvent`, `Estimate<T>`, `SensorMode`; the Ring-boundary lint; the ADR index (§5.6); the shared **config index** (`@chewie/config`) that owns chew/pause timing defaults. |
 | `docs/03-chewing-engine-and-art.md` | `@chewie/engine` XState phase engine; the sleep-inclusive **`ChewieClock`** (§2) that is the single source of truth for elapsed time; **process-death checkpoint / resume / reaper** and the `unattended` flag (§2.6) this doc keys eligibility off; `@chewie/art` (how a `BehaviorScore` seeds ChewArt). |
-| `docs/04-sensing-fusion.md` | `@chewie/fusion` (Ring 2): `SensorMode`, production of `BiteEvent`s, weight-time step detection, chew/hand-to-mouth cues, **and all grams→dimensionless-signal conversion** (§2, §5.4). We consume its *outputs*; we never import it. |
-| `docs/07-data-model.md` | Encrypted schema (no weight/BMI/goal columns); the `SessionCheckpoint`/`MealSession` shapes; the **`LocalProfile` model** that owns per-profile baselines and the shared-device decision (§14). |
-| `docs/08-privacy-dpia.md` | DPIA, Article 9 handling, the age-band field, minor-safe defaults; records the safeguard's honest detection limits (§11.2) as a DPIA line item. |
+| `docs/04-sensing-and-ai.md` | `@chewie/fusion` (Ring 2): `SensorMode`, production of `BiteEvent`s, weight-time step detection, chew/hand-to-mouth cues, **and all grams→dimensionless-signal conversion** (§2, §5.4). We consume its *outputs*; we never import it. |
+| `docs/07-data-model-and-privacy.md` | Encrypted schema (no weight/BMI/goal columns); the `SessionCheckpoint`/`MealSession` shapes; the **`LocalProfile` model** that owns per-profile baselines and the shared-device decision (§14). |
+| `docs/07-data-model-and-privacy.md` | DPIA, Article 9 handling, the age-band field, minor-safe defaults; records the safeguard's honest detection limits (§11.2) as a DPIA line item. |
+| `docs/10-nourishment-and-intake-targets.md` | **Nourishment Mode** & the two-sided **Portion Balance** (Adequacy) score in the *separate* `@chewie/nourishment` package. Reuses this doc's **`bandScore` primitive** (§4) two-sided; depends on the **intake wall** (§2) staying intact; adds the optional Adequacy facet to the composite (§6) — assembled *outside* `scoreBehavior()`. |
 | `docs/adr/README.md` | Single ADR index. This doc is governed by **ADR-0008 — isolated behavior scoring** (scoring cannot receive intake), and cites **ADR-0005** (scale-primary + fusion modes) and **ADR-0010** (sleep-inclusive `ChewieClock` + recovery). No ad-hoc ADR numbers appear here. |
 
 ---
 
 ## 1. Design goals & non-negotiables
 
-1. **Primary score measures behavior, not quantity.** Pace, chew thoroughness, honored pauses, steady rhythm, bite *uniformity*, and (where measurable without surveillance) presence. *Eating less — or taking smaller bites, or stopping earlier — must never, by any path, raise the score.*
-2. **Bands, not minimization.** Every behavioral magnitude signal (pace, chew time) is scored by *distance from a comfortable band*; both extremes lower the score; the band center = 100. **Absolute food quantity is not a scored dimension at all.**
+1. **Primary score measures behavior, not quantity.** Pace, chew thoroughness, honored pauses, steady rhythm, bite *uniformity*, and (where measurable without surveillance) presence. *Eating less — or taking smaller bites, or stopping earlier — must never, by any path, raise the score.* (This invariant holds for the composite the user sees, too: in the opt-in Nourishment Mode, under-eating *lowers* the two-sided Portion Balance score — never raises it — §2.1.)
+2. **Bands, not minimization.** Every behavioral magnitude signal (pace, chew time) is scored by *distance from a comfortable band*; both extremes lower the score; the band center = 100. **Absolute food quantity is not a scored dimension in `@chewie/scoring` (the always-on behavior score).** A separate, opt-in, two-sided **Portion Balance** (a.k.a. *Adequacy*) score in the `@chewie/nourishment` package *may* score energy/mass adequacy — off by default, adults-only, and likewise band-based so that *both* under- and over-eating lower it (see §2.1 and `docs/10-nourishment-and-intake-targets.md`).
 3. **Honest under any hardware, even mid-meal.** One score works in `NONE / SCALE_ONLY / CAMERA_ONLY / BOTH`, and over a session whose mode *changes* (§13), by scoring from each bite's actual provenance, dropping unavailable sub-scores, renormalizing, and publishing an overall confidence.
 4. **Self-vs-self only, asymptoting at healthy.** "Battle yourself" compares a person to their own gently-adapting baseline; improvement can never be pushed past a healthy band toward an extreme.
 5. **Care over congratulation — honestly scoped.** Detectable disordered-use patterns route to a calm resource card and soften scoring and never produce a personal best; and §11.2 states plainly which patterns are *not* detectable by default.
@@ -93,6 +96,30 @@ Because grams never reach scoring, there is **no `bandScore(grams, …)` call in
 > 1. `packages/scoring` may not import `@chewie/fusion`, `@chewie/nutrition`, React, or native modules.
 > 2. `packages/scoring` may import only `@chewie/core-types` (types) and `@chewie/config` (band/weight constants).
 > 3. Property test P4 (§12) fails the build if any forbidden key becomes reachable at runtime.
+
+### 2.1 The second, separate plane — `@chewie/nourishment` (opt-in Portion Balance)
+
+The intake wall above governs **`@chewie/scoring` only.** It is *not* a claim that food quantity can never be scored anywhere in the product — it is the guarantee that quantity can never reach the **always-on behavior score**. Chewie's opt-in **Nourishment Mode** adds a **second, parallel scoring plane** that lives entirely on the *intake* side of the fusion wall (`docs/04-sensing-and-ai.md`) and is specified in full in **`docs/10-nourishment-and-intake-targets.md`**. This section fixes the contract between the two planes; the wall itself does not move.
+
+```mermaid
+flowchart LR
+  FUS["@chewie/fusion (Ring 2)"] --> B["BehaviorSignals<br/>DIMENSIONLESS · no grams"]
+  FUS --> I["MealEstimate (intake)<br/>grams · energy · Estimate ranges"]
+  B --> SC["@chewie/scoring (Ring 1)<br/>scoreBehavior() — intake wall (§2)<br/>always-on · calm · numberless at table"]
+  I -. blocked by intake wall (§2) .- SC
+  I --> NM["@chewie/nourishment (Ring 2) — SEPARATE · opt-in<br/>Portion Balance (Adequacy) 0–100<br/>two-sided · adults-only · hideable"]
+  SC --> CMP["Composite (presentation layer)<br/>Behavior always; + Adequacy ONLY when Nourishment Mode ON"]
+  NM --> CMP
+```
+
+The separation this doc must hold:
+
+- **`@chewie/scoring` (behavior plane) does not change.** The wall (§2), ADR-0008, and property tests P1–P9 (§12) are **untouched**; grams still cannot reach `scoreBehavior()`; the live at-the-table surface stays numberless. This is the dinner-table heart and its character is preserved.
+- **`@chewie/nourishment` (adequacy plane) is a separate Ring-2 package** that *does* consume intake (`totalConsumedG` / `nutrition.macros.energyKcal` from `@chewie/fusion`) plus the user's opt-in personal target, and produces the **two-sided Portion Balance** score — **0–100, peaking at the band center, dropping on *both* the under- and the over-eating side**, so "minimize" is structurally impossible. It is off by default, adults-only, and fully hideable (`docs/10` §2, §5, §8).
+- **It reuses the pure `bandScore` primitive (§4), never `scoreBehavior`.** `@chewie/nourishment` may import the `bandScore` function from `@chewie/scoring` (a downward Ring-1 import of a pure math function) but a CI dependency-cruiser rule **forbids it from importing `scoreBehavior`**, so no intake path can ever reach the behavior scorer. The wall stays intact (`docs/10` §5.1, §10).
+- **Composite assembly happens in the presentation layer, not in `scoreBehavior()`.** The Adequacy facet is added to the user-visible composite **only when Nourishment Mode is on**, assembled *outside* the behavior scorer (§6), so no intake value is ever an argument to `scoreBehavior()` — property test **P4** still holds. When numbers are hidden (default, one-tap hide, or any minor), the composite is behavior-only and Nourishment Mode disappears entirely.
+
+> **Why the wall wording softened, not the wall.** The v2 design phrased this as a flat prohibition — *"absolute food quantity is not a scored dimension **at all**."* The product owner has decided the adequacy feature must exist, so the *prohibition* is **scoped to the behavior package** and every safeguard is **re-expressed as a guardrail on the opt-in plane** rather than deleted: two-sided by construction, targets clamped to the WHO healthy range (never optimized downward), adults-only, hideable, honest ranges, explicitly not medical advice, with a care/signpost pathway for concerning patterns. Those guardrails and their property tests are owned by `docs/10` §8 — not weakened here.
 
 ---
 
@@ -374,6 +401,8 @@ export function scoreBehavior(sig: BehaviorSignals, cfg = defaultConfig): Behavi
 
 Overall confidence is surfaced as a soft ring opacity / "rough" label — never hidden.
 
+> **Optional Adequacy facet (Nourishment Mode only).** The number computed above is the intake-free **behavior** composite and never changes. When — and *only* when — Nourishment Mode is on, the **presentation layer** places the two-sided **Portion Balance** score (`@chewie/nourishment`, `docs/10` §5.4) *beside* this behavior composite. That assembly happens **outside `scoreBehavior()`**: no intake value is ever passed to the behavior scorer, so property test P4 and the intake wall (§2, §2.1) are untouched. The two facets are shown **side by side, each labelled — never blended or multiplied into one grade** that could hide a restriction gradient — and the live at-the-table surface stays numberless regardless (R-HUD-1). When numbers are hidden (default, one-tap hide, or any minor), only the behavior composite renders.
+
 ```mermaid
 flowchart LR
   F["@chewie/fusion (Ring 2)<br/>BiteEvents · rates · dimensionless CVs"] --> BS["BehaviorSignals<br/>(intake-wall guarded · no grams)"]
@@ -504,6 +533,7 @@ Because the composite is quantity-invariant (§9, P1/P2), a PB **cannot** be rea
 | **Chase an ever-higher target** | The "battle" target is your baseline *score*, itself bounded by fixed health bands, so improvement asymptotes at healthy. Coaching is clamped to bands (§10.4) and has **no** cue about portion or amount. |
 | **Distress becomes a high score** | Safeguarded / unattended sessions are ineligible for baseline and PB and route to care (§11); scoring is softened or suppressed. |
 | **Smuggle grams into the score** | The intake wall (§2) plus property P4 fail the build if `meanBiteGrams`/`gramsPerMin`/any mass field becomes reachable in `BehaviorSignals`. |
+| **Use Nourishment Mode as a covert weight-loss flow** | The opt-in adequacy plane (§2.1, `docs/10`) is *two-sided* (under-eating lowers Portion Balance as much as over-eating), its per-meal target is *clamped to the WHO healthy range*, it exposes *no* goal-weight / calorie-budget / deficit field in its API, and it is adults-only + hideable. "Minimize" scores near **zero**, not 100; underweight stats route to care, never to a smaller target. Enforced by `docs/10` property tests P-N1…P-N5. |
 
 ---
 
@@ -725,7 +755,7 @@ The overall first-run/onboarding flow (age gate, permission priming, first-meal 
 
 ## 17. The separate "Balance & Variety" insight (optional, off by default)
 
-Implemented in `@chewie/nutrition` (full data mapping in `docs/07-data-model.md` / the nutrition insight it houses); sketched here only to fix the **contract that keeps it away from the score.**
+Implemented in `@chewie/nutrition` (full data mapping in `docs/07-data-model-and-privacy.md` / the nutrition insight it houses); sketched here only to fix the **contract that keeps it away from the score.**
 
 - **Off by default.** Enabled only by explicit adult opt-in; **disabled for minors**; every figure gated by the app-wide `intakeNumbersHidden` switch, which *disables the pipeline*, not just the view.
 - **Qualitative & non-graded.** No `NutritionScore`, no `/100 healthiness`, no red "bad meal." The token `NutritionScore` is banned (lint rule).
@@ -763,7 +793,9 @@ The user's requested "how healthy was the meal" number is delivered *as this ins
 
 ```ts
 // @chewie/scoring — imports ONLY @chewie/core-types (types) and @chewie/config (constants)
-export function bandScore(x: number, b: BandSpec): number;
+export function bandScore(x: number, b: BandSpec): number; // pure primitive; REUSED (two-sided) by
+//   @chewie/nourishment for Portion Balance (docs/10 §4.6, §5). That package may import THIS function
+//   but NEVER scoreBehavior — a dependency-cruiser rule (§2.1) forbids it, so the intake wall holds.
 export function scoreBehavior(sig: BehaviorSignals, cfg?: ScoringConfig): BehaviorScore;
 export function updateBaseline(base: Baseline, score: BehaviorScore, ctx: SessionCtx): Baseline;
 export function deltaVsBaseline(score: BehaviorScore, base: Baseline): BaselineDelta | undefined;
@@ -778,4 +810,4 @@ export const DEFAULT_BANDS: BandConfig; // re-exported from @chewie/config; clin
 
 ## 20. Open questions & risks
 
-See the structured `open_questions` returned with this doc; the full risk register lives in `docs/00-architecture-spine.md`. The scoring-specific residual risks are: (1) every band constant remains an unvalidated placeholder until the Phase-5 clinician gate; (2) the §11.2 detection gap (a disengaged restrictor is unreachable) is mitigated but not solved and must be re-reviewed each release; (3) coarse camera "table presence" must be continuously audited so it never drifts toward attention/gaze monitoring.
+See the structured `open_questions` returned with this doc; the full risk register lives in `docs/02-system-architecture.md`. The scoring-specific residual risks are: (1) every band constant remains an unvalidated placeholder until the Phase-5 clinician gate; (2) the §11.2 detection gap (a disengaged restrictor is unreachable) is mitigated but not solved and must be re-reviewed each release; (3) coarse camera "table presence" must be continuously audited so it never drifts toward attention/gaze monitoring.

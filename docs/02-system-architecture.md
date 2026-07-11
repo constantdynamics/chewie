@@ -1,7 +1,7 @@
 # Chewie System Architecture and Tech Stack
 
 **Doc:** `docs/02-system-architecture.md`
-**Status:** Canonical expansion of the architecture spine (`docs/00-architecture-spine.md`). Authoritative for module boundaries, the local/cloud split, platform choice, cross-cutting data flow, and the shared type/ADR/config indexes referenced by sibling docs.
+**Status:** Canonical expansion of the architecture spine (`docs/02-system-architecture.md`). Authoritative for module boundaries, the local/cloud split, platform choice, cross-cutting data flow, and the shared type/ADR/config indexes referenced by sibling docs.
 **Owner:** System Architecture & Tech Stack area.
 **Audience:** All engineers. Read this and the spine before the per-area docs.
 **Relationship to the spine:** This doc is the load-bearing expansion of the shared spine. Where a topic has its own doc (session engine + art, sensing/fusion, scoring, companion, nutrition, data model, privacy/DPIA) this doc defines the *seam* and defers the internals. Sibling docs are indexed in §22 and follow the **single canonical numbering convention** committed in this repo (§5.3).
@@ -871,13 +871,13 @@ Single numbering convention (§5.3); CI link-checker enforces these paths.
 
 | # | File | Owns |
 |---|---|---|
-| 00 | `docs/00-architecture-spine.md` | the committed canonical spine (source of the conventions here) |
-| 01 | `docs/01-product-vision-and-onboarding.md` | product vision; **first-run/onboarding flow owner** (age-gate-first, just-in-time permission priming, first-meal guidance) and **empty states** (zero tiles/history/baseline) |
+| 00 | `docs/02-system-architecture.md` | the committed canonical spine (source of the conventions here) |
+| 01 | `docs/01-product-vision.md` | product vision; **first-run/onboarding flow owner** (age-gate-first, just-in-time permission priming, first-meal guidance) and **empty states** (zero tiles/history/baseline) |
 | 02 | `docs/02-system-architecture.md` | **this doc** — topology, conventions, seams, shared-type/ADR/config indexes |
 | 03 | `docs/03-chewing-engine-and-art.md` | XState statechart, cues, the `ChewieClock` native module, process-death recovery, ChewArt algorithm/export |
-| 04 | `docs/04-sensing-fusion.md` | streaming-first scale drivers, step detection, fusion math |
-| 05 | `docs/05-scoring-and-ethics.md` | behavior bands, property tests, disordered-use safeguard (incl. §11.2 limitation), Balance & Variety insight |
-| 06 | `docs/06-companion-realtime.md` | pairing UX, WebRTC planes, revocation semantics (§12.2), coaching copy |
-| 07 | `docs/07-data-model.md` | encrypted schema, the canonical `pairings` migration, `SessionCheckpoint` shape, `MealSession` lifecycle + reaper, profile model |
-| 08 | `docs/08-privacy-dpia.md` | DPIA, Article 9, DSAR, age gate + minor-safe defaults, observability field allow-list review |
+| 04 | `docs/04-sensing-and-ai.md` | streaming-first scale drivers, step detection, fusion math |
+| 05 | `docs/05-scoring-model.md` | behavior bands, property tests, disordered-use safeguard (incl. §11.2 limitation), Balance & Variety insight |
+| 06 | `docs/06-companion-and-pairing.md` | pairing UX, WebRTC planes, revocation semantics (§12.2), coaching copy |
+| 07 | `docs/07-data-model-and-privacy.md` | encrypted schema, the canonical `pairings` migration, `SessionCheckpoint` shape, `MealSession` lifecycle + reaper, profile model |
+| 08 | `docs/07-data-model-and-privacy.md` | DPIA, Article 9, DSAR, age gate + minor-safe defaults, observability field allow-list review |
 | ADR | `docs/adr/NNNN-*.md` | decision records — single index in §5.6 |

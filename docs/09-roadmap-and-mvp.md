@@ -1,7 +1,7 @@
 # Roadmap, MVP Scope & Delivery Plan
 
 > **Owner:** Delivery / Roadmap area.
-> **Status:** Draft v0.2 — conforms to the Chewie Canonical Architecture Spine (`docs/00-architecture-spine.md`).
+> **Status:** Draft v0.2 — conforms to the Chewie Canonical Architecture Spine (`docs/02-system-architecture.md`).
 > **Scope of this doc:** phasing, scope-per-phase, definition of done, build-vs-buy, effort/sequencing, the cut list, release gates, and the riskiest assumptions to validate. It does **not** re-derive the algorithms, data model, shared types, or ethics rules — those live in the sibling docs referenced below, and this plan **cites** them rather than re-declaring them.
 
 ## Related documents (canonical numbering: `docs/NN-topic.md`, ADRs `docs/adr/NNNN-title.md`)
@@ -10,7 +10,7 @@ This repo uses one flat numbering scheme. **This file is `docs/09-roadmap-and-mv
 
 | Concern | Doc | Package |
 |---|---|---|
-| **Canonical architecture spine (source of truth)** | `docs/00-architecture-spine.md` | — |
+| **Canonical architecture spine (source of truth)** | `docs/02-system-architecture.md` | — |
 | Product vision, ethics, **first-run/onboarding flow & empty states** | `docs/01-product-vision.md` | — |
 | System architecture, ring topology, **frozen shared types**, ADR index | `docs/02-system-architecture.md` | `@chewie/core-types` |
 | Calm loop, phase engine, **`ChewieClock`, session checkpoint/recovery**, ChewArt | `docs/03-chewing-engine-and-art.md` | `@chewie/engine`, `@chewie/art` |

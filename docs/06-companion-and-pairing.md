@@ -15,15 +15,15 @@ It conforms to the shared architecture spine and **does not re-define load-beari
 
 | Doc | What this doc consumes from it (never redefines) |
 |---|---|
-| `docs/00-architecture-spine.md` | The spine + the single authority reconciling doc filenames and the ADR index. |
+| `docs/02-system-architecture.md` | The spine + the single authority reconciling doc filenames and the ADR index. |
 | `docs/01-product-vision.md` | Product framing, the ethical mandate, the first-run/onboarding flow this doc plugs a share-consent step into. |
 | `docs/02-system-architecture.md` | **The canonical `pairings` migration + `is_paired()` predicate (§12.1), the corrected revocation semantics (§12.2), the `CompanionStateMsg` shared type (§14), and the ADR index (§5.6).** This doc is the expansion of that seam. |
 | `docs/03-chewing-engine-and-art.md` | The `ChewieClock` sleep-inclusive monotonic clock (§2.2) the countdown mirror synchronises against, and in-progress-session recovery (§8.4). |
 | `docs/04-sensing-and-ai.md` | The camera track this ring may relay; the shared thermal budget in companion mode (§7.5 there / §7.5 here). |
 | `docs/05-scoring-model.md` | `BehaviorScore`, the symmetric bands, and **R-HUD-1 (no live numeric score) / R-COERCE (anti-coercion) rules** this ring must not violate over the wire. |
-| `docs/07-data-and-persistence.md` | `LocalProfile`, the age-band the companion gate reads, the default-timings config, and the single-profile-per-device decision (§13.1 of doc 02). |
-| `docs/08-privacy-safeguards-and-onboarding.md` | GDPR Article 9 handling, the DPIA, minor-safe defaults, and the honest limits of the disordered-use safeguard. |
-| `docs/09-testing-spikes-and-dod.md` | The **S6 spike** (real TURN relay-rate on carrier networks) and the Definition of Done gates this ring must pass. |
+| `docs/07-data-model-and-privacy.md` | `LocalProfile`, the age-band the companion gate reads, the default-timings config, and the single-profile-per-device decision (§13.1 of doc 02). |
+| `docs/08-responsible-design-and-safety.md` | GDPR Article 9 handling, the DPIA, minor-safe defaults, and the honest limits of the disordered-use safeguard. |
+| `docs/09-roadmap-and-mvp.md` | The **S6 spike** (real TURN relay-rate on carrier networks) and the Definition of Done gates this ring must pass. |
 
 Shared cross-ring types — `Estimate<T>`, `SensorMode`, `BiteEvent`, `CompanionStateMsg` — are defined **once** in the Ring-1 package `@chewie/core-types` and are **imported, never re-declared** here (spine rule, doc 02 §5.4).
 
@@ -756,7 +756,7 @@ Because forbidden fields are never serialised, a companion client cannot render 
 - **NAT/TURN reliability on carrier networks** and the **15–40 % relay-rate uncertainty** — the monthly cost headline is *deliberately a range* until the **S6 spike** (`docs/09`) measures the real rate on carrier CGNAT; coturn fallback bounds the worst case.
 - **Supabase Realtime limits** (per-message billing, ~256 KB cap) constrain thumbnail size/rate and the state-only fallback — capped in §7.3; monitor message volume.
 - **Thermal contention** with Ring 2 ML over a long meal (multiplied by mesh) — mitigated by the shared duty-cycler, but bounded by `docs/04`/`docs/09` S3's hard pass/fail budget on the low-end reference phone.
-- **Cross-doc filename drift for this doc.** Sibling docs reference this file as `06-companion-plane.md` (doc 04) and `06-companion-realtime.md` (doc 02), while its committed path is `docs/06-companion-and-pairing.md`. The CI link-checker (`pnpm docs:links`) plus the single index in `docs/00-architecture-spine.md` / `docs/adr/README.md` must reconcile these to one canonical filename; until then this is a known broken-link risk (root-cause of the cross-reference findings).
+- **Cross-doc filename drift for this doc.** Sibling docs reference this file as `06-companion-plane.md` (doc 04) and `06-companion-realtime.md` (doc 02), while its committed path is `docs/06-companion-and-pairing.md`. The CI link-checker (`pnpm docs:links`) plus the single index in `docs/02-system-architecture.md` / `docs/adr/README.md` must reconcile these to one canonical filename; until then this is a known broken-link risk (root-cause of the cross-reference findings).
 
 **Open questions**
 1. **Companion→eater reactions:** allow a tiny, eater-enabled, **non-numeric** "proud of you" reaction, or does *any* companion→eater channel undermine witness-not-controller? (Leaning: a minimal, eater-enabled reaction set only.)
