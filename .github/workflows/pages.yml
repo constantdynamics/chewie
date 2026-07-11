@@ -1,23 +1,26 @@
-name: Deploy docs to GitHub Pages
+name: Deploy Chewie PWA to GitHub Pages
 
 on:
   push:
     branches:
-      - claude/kauwapp-architecture-design-x4nngo
       - main
+      - claude/kauwapp-architecture-design-x4nngo
     paths:
-      - "docs/**"
-      - "mkdocs.yml"
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
-# Allow the workflow to publish to Pages and mint the deploy token.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# One live deploy at a time; let an in-progress run finish.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -29,29 +32,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.x"
+          node-version: "20"
+          cache: "npm"
 
-      - name: Install MkDocs Material
-        run: pip install mkdocs-material
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Build site
-        run: mkdocs build --clean --site-dir ./site
+      - name: Build PWA
+        run: npm run build
 
-      - name: Configure Pages (enable if needed)
+      - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site
+          path: ./dist
 
   deploy:
     needs: build
+    # Pages only allows deploys from the default branch; on feature branches we just validate the build.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
