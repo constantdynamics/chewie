@@ -1,18 +1,80 @@
-# Chewie — Design Documentation
+# Chewie 🥢
 
-This directory holds the complete architecture and product design for Chewie, a calm
-mindful-eating companion. The [root README](../README.md) is the elevator pitch; this
-index is the map.
+**A calm companion that helps you eat slower, chew more, and stay in your body during a meal.**
 
-## How the design is organised
+Chewie turns your phone into a quiet table-side coach. The whole screen breathes between a
+**chew** colour and a **pause** colour, so you learn a slower rhythm without counting or
+staring at numbers. Every finished meal becomes a unique piece of generative mosaic art
+(**ChewArt**) that grows into a personal artwork over months.
 
-The product is built as **three concentric rings**, and the docs follow the same shape:
+Beyond the calm core, Chewie can *optionally* sense a meal (a Bluetooth kitchen scale as the
+primary sensor, the camera as a helper), coach you gently, let a trusted person watch along,
+and — for adults who opt in — help you land inside your **ideal amount**: a healthy,
+**two-sided** range where eating *too little* counts against you exactly as much as eating
+*too much*.
 
-- **Ring 1 · Calm Core** — a complete, offline, account-free app (docs 01, 03, 05).
-- **Ring 2 · Sensing** — an optional, fully on-device sensing & scoring layer (docs 04, 10).
-- **Ring 3 · Companion** — the only cloud-touching layer, opt-in and consent-first (doc 06).
+!!! note "This site is the design, not the app (yet)"
+    Chewie currently exists as an **architecture & product design**. No application code has
+    been written yet — the design is the deliverable, and the
+    [roadmap](09-roadmap-and-mvp.md) is the build plan.
 
-Docs 02, 07, 08 and 09 are cross-cutting (architecture, data/privacy, safety, delivery).
+## The idea in one picture
+
+```mermaid
+flowchart TB
+  subgraph R1["Ring 1 · Calm Core — always on, fully offline, no account"]
+    A["Full-screen chew/pause rhythm"] --- B["Generative ChewArt mosaic"]
+    B --- C["Behaviour-only Mindful-Eating score<br/>(pace · chewing · rhythm · consistency)"]
+  end
+  subgraph R2["Ring 2 · Sensing — optional, 100% on-device"]
+    D["BLE kitchen scale<br/>(primary sensor)"] --- E["Camera food-ID + cues<br/>(secondary)"]
+    E --- F["Sensor fusion → bites, pace, grams"]
+    F --- G["Opt-in Nourishment Mode<br/>two-sided Portion Balance"]
+  end
+  subgraph R3["Ring 3 · Companion — optional, the only cloud-touching layer"]
+    H["Consent-first WebRTC live view"] --- I["Live mirror of app state"]
+  end
+  R1 --> R2 --> R3
+```
+
+Each ring is independent: **remove Rings 2 and 3 and you still have a complete, lovable,
+offline app.** A failed cloud call can never break the dinner table.
+
+## What makes it different
+
+- **The calm core never asks how much you ate or what you weigh.** The always-on score
+  measures *behaviour* — slowness, thorough chewing, honoured pauses, steady rhythm,
+  consistency against your own gentle baseline — inside healthy **bands** where both extremes
+  lower the score. Eating less can *never* raise it; that's enforced in code, not just policy.
+- **Your artwork is the reward.** ChewArt tiles are seeded by *how* you ate, stored as tiny
+  seed+params (never as images), reproducible and exportable.
+- **The scale is the star sensor.** A Bluetooth kitchen scale gives ground-truth mass, precise
+  per-bite weight loss, and exact pace — far more reliable than guessing from a camera. The
+  camera adds food identification and cues, and powers the companion view. Everything degrades
+  gracefully: scale-only, camera-only, both, or manual.
+- **Nourishment Mode is opt-in, adults-only, and two-sided.** It coaches you *into and inside*
+  your ideal amount, never toward eating less. See [doc 10](10-nourishment-and-intake-targets.md).
+- **Watching-along is consent-first:** peer-to-peer, encrypted, ephemeral, never recorded, and
+  revocable.
+- **Privacy is the default:** local-first, encrypted-at-rest, no account for the core, camera
+  frames never leave the device, health data treated as GDPR Article 9.
+
+## The documents
+
+| # | Document | What's inside |
+|---|----------|---------------|
+| 01 | [Product Vision, Personas & Core Loop](01-product-vision.md) | The problem, who it's for, the calm core loop, principles & non-goals, the "battle yourself" motivation reframed healthily |
+| 02 | [System Architecture & Tech Stack](02-system-architecture.md) | Concentric-ring topology, React Native + Expo, Supabase (EU), what-runs-where, CI/deployment |
+| 03 | [Chewing Engine & Generative ChewArt](03-chewing-engine-and-art.md) | Drift-free session FSM, full-screen visual/colour system, the ChewArt generator, gallery & export |
+| 04 | [Sensing, Sensor Fusion & Meal AI](04-sensing-and-ai.md) | BLE scale drivers, camera pipeline, fusion modes, food ID, honest nutrition estimation with ranges |
+| 05 | [Mindful-Eating Score & Self-Competition](05-scoring-model.md) | Behaviour-only banded scoring, the intake wall, live coaching, personal baseline |
+| 06 | [Companion Mode, Secure Pairing & Realtime](06-companion-and-pairing.md) | WebRTC P2P, signalling, pairing/consent, state-sync, TURN |
+| 07 | [Data Model, Sync, Privacy & GDPR](07-data-model-and-privacy.md) | Local-first encrypted schema, RLS, consent tiers, Article 9 handling, export/delete |
+| 08 | [Responsible Design, Safety & Accessibility](08-responsible-design-and-safety.md) | Eating-disorder-risk safeguards, onboarding/age gate, honesty rules, accessibility, red-team |
+| 09 | [Roadmap, MVP Scope & Delivery Plan](09-roadmap-and-mvp.md) | Phased plan (calm core → scale → camera → companion → cloud), spikes, definition of done |
+| 10 | [Nourishment Mode & Two-Sided Portion Balance](10-nourishment-and-intake-targets.md) | Opt-in profile → BMI/healthy-range/TDEE → two-sided per-meal target band & adequacy score |
+
+Architecture decisions are recorded as [ADRs](adr/README.md).
 
 ## Reading paths
 
@@ -21,29 +83,12 @@ Docs 02, 07, 08 and 09 are cross-cutting (architecture, data/privacy, safety, de
 - **Working on sensing / scoring / intake?** → 04 → 05 → 10, with 08 as the guardrail.
 - **Reviewing safety & ethics?** → 08 first, then 05 §1–2, 07 §3, and 10 §0–2.
 
-## The documents
+## A note on responsibility
 
-| # | File | Summary |
-|---|------|---------|
-| 01 | [`01-product-vision.md`](01-product-vision.md) | Problem, personas & jobs-to-be-done, the calm chew/pause core loop, calm-technology principles, explicit non-goals, and the healthy reframing of "battle yourself" (personal baseline, never punishment). |
-| 02 | [`02-system-architecture.md`](02-system-architecture.md) | The authoritative architecture: concentric-ring topology with strict dependency ordering, React Native + Expo client, EU-hosted Supabase backend, what-runs-where, on-device-first AI, and CI/deployment. |
-| 03 | [`03-chewing-engine-and-art.md`](03-chewing-engine-and-art.md) | The drift-free session state machine (monotonic clock, backgrounding-safe), the full-screen colour/contrast visual system, and the deterministic generative ChewArt engine, gallery and export. |
-| 04 | [`04-sensing-and-ai.md`](04-sensing-and-ai.md) | The optional on-device sensing layer: BLE scale as primary sensor with a driver fallback chain, camera food-ID and cues, sensor fusion with four graceful-degradation modes, and honestly-ranged nutrition estimation. |
-| 05 | [`05-scoring-model.md`](05-scoring-model.md) | The behaviour-only Mindful-Eating score: banded sub-scores (pace, chew, rhythm, uniformity, consistency), the structural "intake wall" keeping grams out of scoring, live coaching, and self-competition. |
-| 06 | [`06-companion-and-pairing.md`](06-companion-and-pairing.md) | Companion mode: WebRTC P2P live view + a data-channel state mirror, Supabase signalling, secure short-lived/QR pairing with MITM protection, and consent-first, ephemeral, revocable sharing. |
-| 07 | [`07-data-model-and-privacy.md`](07-data-model-and-privacy.md) | Local-first encrypted data model (TypeScript + Postgres + RLS), consent tiers, optional zero-knowledge sync, GDPR (Article 9 handling, export/delete), and the table-scoped schema guards. |
-| 08 | [`08-responsible-design-and-safety.md`](08-responsible-design-and-safety.md) | Eating-disorder-risk analysis and concrete mitigations, onboarding & age gate, honesty-of-estimate rules, accessibility, a lexicon guard, and a product red-team. The checklist other docs must satisfy. |
-| 09 | [`09-roadmap-and-mvp.md`](09-roadmap-and-mvp.md) | The phased delivery plan (calm core → scale → camera → companion → cloud), definition of done per phase, build-vs-buy calls, testing spikes, and the riskiest assumptions to validate early. |
-| 10 | [`10-nourishment-and-intake-targets.md`](10-nourishment-and-intake-targets.md) | Opt-in, adults-only Nourishment Mode: the anthropometric profile → BMI, WHO healthy range and Mifflin–St Jeor TDEE → a two-sided per-meal target band and Portion Balance score, with all safeguards. |
-
-## Architecture decisions
-
-Load-bearing choices are recorded as ADRs in [`adr/`](adr/README.md).
-
-## Conventions
-
-- Docs reference each other by their **on-disk filename** (e.g. `docs/05-scoring-model.md`);
-  a CI link-checker is intended to keep these honest.
-- Package names follow `@chewie/*` (e.g. `@chewie/engine`, `@chewie/scoring`,
-  `@chewie/fusion`, `@chewie/nourishment`).
-- "Ring N may never import Ring N+1" is enforced by module boundaries and lint rules.
+Chewie touches eating, bodies, and (optionally) intake and weight — areas where a careless app
+can do real harm. The calm core is numberless, the behaviour score can't be gamed toward eating
+less, intake features are opt-in, two-sided, clamped to healthy ranges, and gated behind an
+eating-disorder-clinician review, and there are care pathways instead of congratulation when
+usage looks concerning. Chewie is a wellbeing companion, **not a medical device** — no diagnosis,
+no clinical precision claims, estimates always shown as ranges. See
+[Responsible Design & Safety](08-responsible-design-and-safety.md).
