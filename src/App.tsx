@@ -5,14 +5,17 @@ import { SettingsSheet } from './components/SettingsSheet'
 import { GallerySheet } from './components/GallerySheet'
 import { NourishmentSheet } from './components/NourishmentSheet'
 import { MealDoneSheet } from './components/MealDoneSheet'
+import { LeaderboardSheet } from './components/LeaderboardSheet'
+import { StarMode } from './components/StarMode'
 import { useSession } from './hooks/useSession'
-import { addTile, useStore } from './lib/store'
+import type { StarSummary } from './hooks/useStarSession'
+import { addTile, setState, useStore } from './lib/store'
 import { makeTile } from './lib/chewart'
 import { contrastColor } from './lib/contrast'
 import { pickTip } from './lib/tips'
 import type { Phase, Tile } from './types'
 
-type SheetName = 'settings' | 'gallery' | 'nourishment' | null
+type SheetName = 'settings' | 'gallery' | 'nourishment' | 'leaderboard' | null
 
 export default function App() {
   const state = useStore()
@@ -31,15 +34,18 @@ export default function App() {
     }
   }, [state.settings.haptics])
 
-  const onEnd = useCallback((bites: number, durationSec: number) => {
-    if (bites < 1) return
-    const tile = makeTile({ id: Date.now(), bites, durationSec, quick })
-    addTile(tile)
-    setJustFinished(tile)
-  }, [quick])
+  const onEnd = useCallback(
+    (bites: number, durationSec: number) => {
+      if (bites < 1) return
+      const tile: Tile = { ...makeTile({ id: Date.now(), bites, durationSec, quick }), mode: 'rhythm' }
+      addTile(tile)
+      setJustFinished(tile)
+    },
+    [quick],
+  )
 
   const session = useSession(s, quick, onBite, onEnd)
-  const { running, phase, bite, progress, elapsedSec } = session
+  const { running, phase, bite, progress } = session
 
   // Colours: whole screen changes with the phase; icon/text pick the best contrast.
   const bg = running && phase === 'pause' ? s.pauseColor : s.chewColor
@@ -101,6 +107,66 @@ export default function App() {
     }
   }
 
+  // ---- Star mode ----------------------------------------------------------
+  const onStarMealEnd = useCallback(
+    (summary: StarSummary) => {
+      const base = makeTile({
+        id: Date.now(),
+        bites: summary.bites,
+        durationSec: summary.durationSec,
+        quick: false,
+      })
+      // Let the artwork carry the result: more stars, richer colour.
+      const tile: Tile = {
+        ...base,
+        hue: (base.hue + summary.stars * 7) % 360,
+        sat: Math.min(92, base.sat + summary.stars),
+        mode: 'stars',
+        stars: summary.stars,
+        starGoal: s.starGoal,
+        targetSec: s.chewSeconds,
+        avgBiteSec: summary.avgBiteSec,
+        bestBiteSec: summary.bestBiteSec,
+      }
+      addTile(tile)
+      setJustFinished(tile)
+    },
+    [s.starGoal, s.chewSeconds],
+  )
+
+  const sheets = (
+    <>
+      {sheet === 'settings' && <SettingsSheet onClose={() => setSheet(null)} />}
+      {sheet === 'gallery' && (
+        <GallerySheet onClose={() => setSheet(null)} onOpenLeaderboard={() => setSheet('leaderboard')} />
+      )}
+      {sheet === 'nourishment' && <NourishmentSheet onClose={() => setSheet(null)} />}
+      {sheet === 'leaderboard' && (
+        <LeaderboardSheet onClose={() => setSheet(null)} highlightId={justFinished?.id} />
+      )}
+      {justFinished && <MealDoneSheet tile={justFinished} onClose={() => setJustFinished(null)} />}
+    </>
+  )
+
+  if (state.mode === 'stars') {
+    return (
+      <div className="app">
+        <StarMode
+          targetSec={s.chewSeconds}
+          goal={s.starGoal}
+          haptics={s.haptics}
+          hideNumbers={state.hideNumbers}
+          onMealEnd={onStarMealEnd}
+          onOpenLeaderboard={() => setSheet('leaderboard')}
+          onOpenGallery={() => setSheet('gallery')}
+          onOpenSettings={() => setSheet('settings')}
+          onSwitchToRhythm={() => setState({ mode: 'rhythm' })}
+        />
+        {sheets}
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <MealScreen
@@ -130,15 +196,10 @@ export default function App() {
         onGallery={() => setSheet('gallery')}
         onNourishment={() => setSheet('nourishment')}
         onSettings={() => setSheet('settings')}
+        onSwitchToStars={running ? undefined : () => setState({ mode: 'stars' })}
       />
 
-      {sheet === 'settings' && <SettingsSheet onClose={() => setSheet(null)} />}
-      {sheet === 'gallery' && <GallerySheet onClose={() => setSheet(null)} />}
-      {sheet === 'nourishment' && <NourishmentSheet onClose={() => setSheet(null)} />}
-      {justFinished && <MealDoneSheet tile={justFinished} onClose={() => setJustFinished(null)} />}
-
-      {/* elapsedSec kept for potential future stats; referenced to satisfy noUnused checks */}
-      <span hidden aria-hidden>{Math.round(elapsedSec)}</span>
+      {sheets}
     </div>
   )
 }

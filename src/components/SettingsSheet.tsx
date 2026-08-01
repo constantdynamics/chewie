@@ -1,5 +1,5 @@
 import { Sheet } from './Sheet'
-import { ColorField, Stepper, Toggle } from './ui'
+import { ColorField, Note, Stepper, Toggle } from './ui'
 import { setState, updateSettings, useStore } from '../lib/store'
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
@@ -27,6 +27,21 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         unit="sec"
         onChange={(v) => updateSettings({ pauseSeconds: v })}
       />
+
+      <h3>Sterrenmodus</h3>
+      <Stepper
+        label="Sterren per maaltijd"
+        value={s.starGoal}
+        min={5}
+        max={50}
+        step={5}
+        unit="★"
+        onChange={(v) => updateSettings({ starGoal: v })}
+      />
+      <Note>
+        Een hap verdient een ster als je minstens <b>{s.chewSeconds} seconden</b> kauwt — dat is je kauwtijd
+        hierboven. Zet je die hoger, dan wordt een ster ook zwaarder verdiend.
+      </Note>
 
       <h3>Snelle modus</h3>
       <Stepper

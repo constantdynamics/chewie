@@ -1,5 +1,8 @@
 export type Phase = 'idle' | 'chew' | 'pause'
 
+/** Which experience the app is showing: the calm auto rhythm, or manual star-scored bites. */
+export type Mode = 'rhythm' | 'stars'
+
 export interface Settings {
   chewSeconds: number
   pauseSeconds: number
@@ -10,6 +13,8 @@ export interface Settings {
   showTips: boolean
   quickChewSeconds: number
   quickPauseSeconds: number
+  /** How many stars fill one meal in star mode. */
+  starGoal: number
 }
 
 export type Sex = 'male' | 'female' | 'other'
@@ -40,6 +45,13 @@ export interface Tile {
   portionScore?: number
   foodLabel?: string
   photo?: string
+  /** Star-mode fields — present only on meals recorded in star mode. */
+  mode?: Mode
+  stars?: number
+  starGoal?: number
+  targetSec?: number
+  avgBiteSec?: number
+  bestBiteSec?: number
 }
 
 export interface Stats {
@@ -58,5 +70,6 @@ export interface AppState {
   hideNumbers: boolean
   stats: Stats
   onboarded: boolean
+  mode: Mode
   version: number
 }

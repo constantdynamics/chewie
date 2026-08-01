@@ -10,7 +10,7 @@ function fmtDuration(sec: number): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
-export function GallerySheet({ onClose }: { onClose: () => void }) {
+export function GallerySheet({ onClose, onOpenLeaderboard }: { onClose: () => void; onOpenLeaderboard?: () => void }) {
   const state = useStore()
   const [selected, setSelected] = useState<Tile | null>(null)
   const tiles = [...state.tiles].reverse()
@@ -32,6 +32,12 @@ export function GallerySheet({ onClose }: { onClose: () => void }) {
           <small>meeste happen</small>
         </div>
       </div>
+
+      {onOpenLeaderboard && (
+        <button className="ghost-btn wide" onClick={onOpenLeaderboard}>
+          ★ Bekijk je ranglijst
+        </button>
+      )}
 
       {tiles.length === 0 ? (
         <p className="note">
@@ -57,6 +63,12 @@ export function GallerySheet({ onClose }: { onClose: () => void }) {
               {selected.bites} happen · {fmtDuration(selected.durationSec)}
               {selected.quick ? ' · snel' : ''}
             </div>
+            {selected.mode === 'stars' && (
+              <div>
+                ★ <b>{selected.stars ?? 0}</b>/{selected.starGoal ?? 25} sterren · gem.{' '}
+                {(selected.avgBiteSec ?? 0).toFixed(1).replace('.', ',')} s per hap
+              </div>
+            )}
             {selected.portionScore != null && (
               <div>
                 Portie-balans: <b>{selected.portionScore}</b>/100
