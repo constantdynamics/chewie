@@ -13,13 +13,16 @@ export function ThemePicker() {
           type="button"
           role="radio"
           aria-checked={active === t.id}
-          className={`theme-card${active === t.id ? ' on' : ''}`}
+          className={`theme-card${active === t.id ? ' on' : ''}${t.style === 'neon' ? ' neon' : ''}`}
           onClick={() =>
+            // A palette carries its treatment: neon palettes switch the app to neon,
+            // calm ones switch it back. The style toggle can still override afterwards.
             updateSettings({
               chewColor: t.chew,
               pauseColor: t.pause,
               starColor: t.star,
               starDeepColor: t.starDeep,
+              uiStyle: t.style,
             })
           }
         >

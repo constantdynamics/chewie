@@ -16,6 +16,10 @@ export const defaultSettings: Settings = {
   quickChewSeconds: 10,
   quickPauseSeconds: 3,
   starGoal: 25,
+  autoPause: true,
+  biteLeadInSec: 2,
+  showRing: true,
+  uiStyle: 'calm',
 }
 
 const defaultState: AppState = {

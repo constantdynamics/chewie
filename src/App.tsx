@@ -55,9 +55,12 @@ export default function App() {
   const session = useSession(s, quick, onBite, onEnd)
   const { running, phase, bite, progress } = session
 
-  // Colours: whole screen changes with the phase; icon/text pick the best contrast.
-  const bg = running && phase === 'pause' ? s.pauseColor : s.chewColor
-  const fg = useMemo(() => contrastColor(bg), [bg])
+  // Colours: the whole screen follows the phase. In neon the screen goes near-black
+  // and the phase colour becomes the glow instead of the wash.
+  const neon = s.uiStyle === 'neon'
+  const phaseColor = running && phase === 'pause' ? s.pauseColor : s.chewColor
+  const bg = neon ? '#05050c' : phaseColor
+  const fg = useMemo(() => (neon ? phaseColor : contrastColor(phaseColor)), [neon, phaseColor])
 
   // Auto-hide controls during an active meal; a tap brings them back.
   const poke = useCallback(() => {
@@ -158,10 +161,14 @@ export default function App() {
 
   if (state.mode === 'stars') {
     return (
-      <div className="app">
+      <div className={`app style-${s.uiStyle}`}>
         <StarMode
           targetSec={s.chewSeconds}
           goal={s.starGoal}
+          leadInSec={s.biteLeadInSec}
+          autoPause={s.autoPause}
+          pauseSec={s.pauseSeconds}
+          showRing={s.showRing}
           haptics={s.haptics}
           hideNumbers={state.hideNumbers}
           onMealEnd={onStarMealEnd}
@@ -176,7 +183,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app style-${s.uiStyle}`}>
       <MealScreen
         phase={running ? phase : 'idle'}
         running={running}
@@ -189,6 +196,7 @@ export default function App() {
         tip={tip}
         hideNumbers={state.hideNumbers}
         preview={preview}
+        glowColor={neon ? phaseColor : undefined}
         onTap={poke}
       />
 

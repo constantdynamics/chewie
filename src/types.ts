@@ -3,6 +3,9 @@ export type Phase = 'idle' | 'chew' | 'pause'
 /** Which experience the app is showing: the calm auto rhythm, or manual star-scored bites. */
 export type Mode = 'rhythm' | 'stars'
 
+/** Visual treatment: soft full-colour, or dark with glowing neon accents. */
+export type UiStyle = 'calm' | 'neon'
+
 export interface Settings {
   chewSeconds: number
   pauseSeconds: number
@@ -18,6 +21,13 @@ export interface Settings {
   quickPauseSeconds: number
   /** How many stars fill one meal in star mode. */
   starGoal: number
+  /** Run the pause automatically after each bite and start the next one for you. */
+  autoPause: boolean
+  /** Seconds at the start of a bite that don't count — you're still taking the food in. */
+  biteLeadInSec: number
+  /** Show the circular chew gauge (off leaves a calmer, emptier screen). */
+  showRing: boolean
+  uiStyle: UiStyle
 }
 
 export type Sex = 'male' | 'female' | 'other'

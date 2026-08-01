@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStarSession, type StarSummary } from '../hooks/useStarSession'
 import { useTapGesture } from '../hooks/useTapGesture'
 import { Star, StarGrid } from './StarGrid'
+import { StarTrack } from './StarTrack'
 import { GearIcon, GridIcon, PlayIcon, StopIcon } from './Icons'
 
 const RING_R = 92
@@ -9,7 +10,7 @@ const RING_C = 2 * Math.PI * RING_R
 const RESULT_MS = 2600
 
 function fmtSec(s: number): string {
-  return `${s.toFixed(1).replace('.', ',')}\u00A0s`
+  return `${s.toFixed(1).replace('.', ',')} s`
 }
 
 function fmtClock(s: number): string {
@@ -17,12 +18,12 @@ function fmtClock(s: number): string {
   return m > 0 ? `${m}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`
 }
 
-/** Dim ring that quietly fills while you chew, and turns gold once the bite is long enough. */
-function ChewRing({ elapsed, target }: { elapsed: number; target: number }) {
+/** Dim gauge that fills while you chew and turns to the accent once the bite is long enough. */
+function ChewRing({ elapsed, target, leadIn, leadInLeft }: { elapsed: number; target: number; leadIn: boolean; leadInLeft: number }) {
   const ratio = Math.min(1, elapsed / target)
   const reached = elapsed >= target
   return (
-    <div className={`chew-ring${reached ? ' reached' : ''}`}>
+    <div className={`chew-ring${reached ? ' reached' : ''}${leadIn ? ' lead-in' : ''}`}>
       <svg viewBox="0 0 220 220" aria-hidden>
         <circle className="ring-track" cx="110" cy="110" r={RING_R} />
         <circle
@@ -35,8 +36,22 @@ function ChewRing({ elapsed, target }: { elapsed: number; target: number }) {
         />
       </svg>
       <div className="ring-core">
-        <Star size={reached ? 46 : 34} filled={reached} />
+        {leadIn ? (
+          <span className="lead-in-count">{Math.ceil(leadInLeft)}</span>
+        ) : (
+          <Star size={reached ? 46 : 34} filled={reached} />
+        )}
       </div>
+    </div>
+  )
+}
+
+/** Ring-less alternative: the same signal, reduced to a single glowing dot. */
+function ChewOrb({ elapsed, target, leadIn, leadInLeft }: { elapsed: number; target: number; leadIn: boolean; leadInLeft: number }) {
+  const reached = elapsed >= target
+  return (
+    <div className={`chew-orb${reached ? ' reached' : ''}${leadIn ? ' lead-in' : ''}`}>
+      {leadIn ? <span className="lead-in-count">{Math.ceil(leadInLeft)}</span> : <Star size={reached ? 54 : 38} filled={reached} />}
     </div>
   )
 }
@@ -44,6 +59,10 @@ function ChewRing({ elapsed, target }: { elapsed: number; target: number }) {
 export function StarMode(props: {
   targetSec: number
   goal: number
+  leadInSec: number
+  autoPause: boolean
+  pauseSec: number
+  showRing: boolean
   haptics: boolean
   hideNumbers: boolean
   onMealEnd: (summary: StarSummary) => void
@@ -52,12 +71,13 @@ export function StarMode(props: {
   onOpenSettings: () => void
   onSwitchToRhythm: () => void
 }) {
-  const { targetSec, goal, haptics, hideNumbers, onMealEnd } = props
-  const s = useStarSession(targetSec)
-  const { phase, stars, last, elapsed, bites } = s
+  const { targetSec, goal, leadInSec, autoPause, pauseSec, showRing, haptics, hideNumbers, onMealEnd } = props
+  const s = useStarSession({ targetSec, leadInSec, autoPause, pauseSec })
+  const { phase, stars, last, chewElapsed, inLeadIn, leadInLeft, pauseLeft, bites } = s
 
   const [hud, setHud] = useState(false)
   const [popped, setPopped] = useState(false)
+  const [tooEarly, setTooEarly] = useState(false)
   const resultTimer = useRef<number | undefined>(undefined)
 
   const buzz = useCallback(
@@ -67,7 +87,7 @@ export function StarMode(props: {
     [haptics],
   )
 
-  // Auto-fade the bright result back to the dark screen.
+  // Auto-fade the bright result, then straight into the next pause when it runs itself.
   useEffect(() => {
     if (phase !== 'result') return
     setPopped(true)
@@ -79,29 +99,38 @@ export function StarMode(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, last?.index])
 
-  // A tap is only acted on after the double-tap window, by which time the phase may
-  // have moved on (a result fades out on its own). Read the live phase, not the one
-  // captured when the finger landed, or that tap would be spent on the wrong action.
+  // The deferred tap must act on the live phase, not the one captured on touch.
   const phaseRef = useRef(phase)
   phaseRef.current = phase
   const hudRef = useRef(hud)
   hudRef.current = hud
-  const { beginBite, endBite, dismissResult } = s
+  const { beginBite, endBite, dismissResult, skipPause } = s
 
   const handleSingleTap = useCallback(
     (atMs: number) => {
       if (hudRef.current) return
-      const now = phaseRef.current
-      if (now === 'waiting') {
-        buzz(12)
-        beginBite(atMs)
-      } else if (now === 'chewing') {
-        endBite(atMs)
-      } else if (now === 'result') {
-        dismissResult()
+      switch (phaseRef.current) {
+        case 'waiting':
+          buzz(12)
+          beginBite(atMs)
+          break
+        case 'pausing':
+          buzz(12)
+          skipPause(atMs)
+          break
+        case 'chewing':
+          if (!endBite(atMs)) {
+            // Still inside the lead-in — you are taking the bite, not finishing it.
+            setTooEarly(true)
+            window.setTimeout(() => setTooEarly(false), 700)
+          }
+          break
+        case 'result':
+          dismissResult()
+          break
       }
     },
-    [beginBite, endBite, dismissResult, buzz],
+    [beginBite, endBite, dismissResult, skipPause, buzz],
   )
 
   const handleDoubleTap = useCallback(() => setHud((v) => !v), [])
@@ -109,10 +138,15 @@ export function StarMode(props: {
 
   // A star landing deserves a different buzz than a short bite.
   const lastIndex = useRef(0)
+  const [justEarned, setJustEarned] = useState(false)
   useEffect(() => {
     if (!last || last.index === lastIndex.current) return
     lastIndex.current = last.index
     buzz(last.star ? [18, 60, 26] : 14)
+    if (last.star) {
+      setJustEarned(true)
+      window.setTimeout(() => setJustEarned(false), 900)
+    }
   }, [last, buzz])
 
   const running = phase !== 'idle'
@@ -127,10 +161,17 @@ export function StarMode(props: {
   }
 
   const stopBubble = (e: React.PointerEvent | React.MouseEvent) => e.stopPropagation()
+  const Gauge = showRing ? ChewRing : ChewOrb
 
   return (
-    <div className={`star-screen phase-${phase}${goalReached ? ' goal-reached' : ''}`} onPointerDown={onPointerDown}>
-      {/* ---------- Idle: pick your meal ---------- */}
+    <div
+      className={`star-screen phase-${phase}${goalReached ? ' goal-reached' : ''}${tooEarly ? ' too-early' : ''}`}
+      onPointerDown={onPointerDown}
+    >
+      {/* The score, always on screen while a meal runs. */}
+      {running && <StarTrack earned={stars} goal={goal} justEarned={justEarned} />}
+
+      {/* ---------- Idle ---------- */}
       {phase === 'idle' && (
         <div className="star-idle" onPointerDown={stopBubble}>
           <div className="star-idle-emblem">
@@ -138,8 +179,8 @@ export function StarMode(props: {
           </div>
           <h1>Sterrenmodus</h1>
           <p className="star-idle-lead">
-            Jij bepaalt elke hap. Tik als je hapt, tik als je slikt — haal je <b>{targetSec} seconden</b>, dan verdien
-            je een ster.
+            Tik als je hap erop zit. De eerste <b>{leadInSec} sec</b> tellen niet mee — daarna kauw je naar{' '}
+            <b>{targetSec} seconden</b> voor een ster.
           </p>
           <div className="goal-pill">
             <Star size={18} filled /> {goal} sterren per maaltijd
@@ -164,24 +205,34 @@ export function StarMode(props: {
         </div>
       )}
 
-      {/* ---------- Waiting: dark, almost nothing ---------- */}
+      {/* ---------- Pause running itself ---------- */}
+      {phase === 'pausing' && (
+        <div className="star-pausing">
+          <div className="pause-count">{Math.ceil(pauseLeft)}</div>
+          <p className="waiting-hint">Neem rustig je volgende hap…</p>
+          <p className="waiting-sub">Tik om nu al te beginnen</p>
+        </div>
+      )}
+
+      {/* ---------- Waiting for you to start ---------- */}
       {phase === 'waiting' && (
         <div className="star-waiting">
           <div className="waiting-pulse" />
           <p className="waiting-hint">Tik zodra je een hap neemt</p>
-          {!hideNumbers && (
-            <div className="waiting-count">
-              <Star size={15} filled /> {stars} / {goal}
-            </div>
-          )}
         </div>
       )}
 
-      {/* ---------- Chewing: dim ring only ---------- */}
+      {/* ---------- Chewing ---------- */}
       {phase === 'chewing' && (
         <div className="star-chewing">
-          <ChewRing elapsed={elapsed} target={targetSec} />
-          <p className="chewing-hint">{elapsed >= targetSec ? 'Lang genoeg — tik als je slikt' : 'Rustig kauwen…'}</p>
+          <Gauge elapsed={chewElapsed} target={targetSec} leadIn={inLeadIn} leadInLeft={leadInLeft} />
+          <p className="chewing-hint">
+            {inLeadIn
+              ? 'Neem je hap…'
+              : chewElapsed >= targetSec
+              ? 'Lang genoeg — tik als je slikt'
+              : 'Rustig kauwen…'}
+          </p>
         </div>
       )}
 
@@ -193,17 +244,12 @@ export function StarMode(props: {
             <Star size={104} filled={last.star} glow={last.star} />
           </div>
           <div className="result-time">{fmtSec(last.durationSec)}</div>
-          <div className="result-verdict">
-            {last.star ? 'Mooi gekauwd — ster verdiend!' : `Net te kort · doel ${targetSec} s`}
-          </div>
-          <div className="result-tally">
-            <Star size={20} filled /> {stars} / {goal}
-          </div>
+          <div className="result-verdict">{last.message}</div>
           {goalReached && last.star && <div className="result-goal">🎉 Je kaart is vol!</div>}
         </div>
       )}
 
-      {/* ---------- HUD: double-tap to see everything ---------- */}
+      {/* ---------- HUD ---------- */}
       {hud && (
         // Tap the dimmed area around the panel to close. The tap must not reach the
         // screen behind it, or closing the HUD would also start a bite.
@@ -271,11 +317,10 @@ export function StarMode(props: {
         </div>
       )}
 
-      {/* Persistent, very dim meal indicator so you know a meal is running. */}
       {running && !hud && phase !== 'result' && !hideNumbers && (
         <div className="star-corner">
           <span className="corner-dot" />{' '}
-          {fmtClock(bites.reduce((a, b) => a + b.durationSec, 0) + (phase === 'chewing' ? elapsed : 0))} gekauwd
+          {fmtClock(bites.reduce((a, b) => a + b.durationSec, 0) + (phase === 'chewing' ? chewElapsed : 0))} gekauwd
         </div>
       )}
     </div>

@@ -1398,3 +1398,235 @@ svg.star.glow {
   color: var(--sheet-fg);
   font-weight: 600;
 }
+
+/* =====================================================================
+   Star track — the running score, always on screen
+   ===================================================================== */
+.star-track {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  gap: 6px;
+  /* Exactly ten stars per row: 10 x 17px + 9 x 6px gap. */
+  width: min(92%, 224px);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.track-star {
+  line-height: 0;
+  color: rgba(255, 255, 255, 0.16);
+  transition: color 320ms ease, filter 320ms ease, transform 320ms ease;
+}
+
+.track-star.on {
+  color: var(--gold);
+  filter: drop-shadow(0 0 6px var(--gold-a45));
+}
+
+.track-star.pop {
+  animation: star-pop 620ms cubic-bezier(0.18, 1.5, 0.4, 1);
+}
+
+/* Keep the track clear of the lit-up result. */
+.phase-result .star-track {
+  opacity: 0.75;
+}
+
+/* =====================================================================
+   Pause that runs itself
+   ===================================================================== */
+.star-pausing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: fade-in 400ms ease;
+}
+
+.pause-count {
+  font-size: 5rem;
+  font-weight: 200;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.34);
+  font-variant-numeric: tabular-nums;
+  animation: soft-beat 1s ease-in-out infinite;
+}
+
+.waiting-sub {
+  margin: 0;
+  color: #55657a;
+  font-size: 0.85rem;
+}
+
+/* =====================================================================
+   Lead-in — the first seconds of a bite don't count
+   ===================================================================== */
+.lead-in-count {
+  font-size: 2.4rem;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.chew-ring.lead-in .ring-arc {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+/* A tap during the lead-in can't end the bite; nudge instead of ignoring silently. */
+.star-screen.too-early .star-chewing {
+  animation: nudge 560ms ease;
+}
+
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  45% { transform: translateX(6px); }
+  70% { transform: translateX(-3px); }
+}
+
+/* =====================================================================
+   Ring-less gauge — same signal, one glowing dot
+   ===================================================================== */
+.chew-orb {
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+  transition: color 600ms ease, background 600ms ease, box-shadow 600ms ease;
+}
+
+.chew-orb.reached {
+  color: var(--gold);
+  background: var(--gold-a08);
+  box-shadow: 0 0 60px var(--gold-a28);
+  animation: soft-beat 2.4s ease-in-out infinite;
+}
+
+.chew-orb.lead-in {
+  background: transparent;
+}
+
+/* =====================================================================
+   Neon style — near-black screens, the colour becomes the light
+   ===================================================================== */
+.neon-glow {
+  position: absolute;
+  inset: -10%;
+  pointer-events: none;
+  animation: fade-in 600ms ease;
+}
+
+.style-neon .meal-screen {
+  color: currentColor;
+}
+
+.style-neon .meal-label,
+.style-neon .meal-sub,
+.style-neon .bite-counter {
+  text-shadow: 0 0 18px currentColor, 0 0 44px currentColor;
+}
+
+.style-neon .meal-icon {
+  filter: drop-shadow(0 0 16px currentColor) drop-shadow(0 0 40px currentColor);
+}
+
+.style-neon .progress {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.style-neon .progress-fill {
+  box-shadow: 0 0 14px currentColor, 0 0 30px currentColor;
+}
+
+.style-neon .meal-screen.pulsing::after {
+  box-shadow: inset 0 0 60px currentColor;
+}
+
+.style-neon .primary-btn,
+.style-neon .icon-btn {
+  box-shadow: 0 0 22px var(--gold-a45), 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.style-neon .star-screen {
+  background: radial-gradient(circle at 50% 42%, #0a0a16 0%, #030308 74%);
+}
+
+.style-neon .star-screen.phase-result {
+  background: radial-gradient(circle at 50% 44%, var(--gold-a26) 0%, #030308 76%);
+}
+
+.style-neon .star-idle h1,
+.style-neon .result-time,
+.style-neon .pause-count {
+  text-shadow: 0 0 24px var(--gold-a55);
+}
+
+.style-neon svg.star.glow,
+.style-neon .track-star.on {
+  filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 0 26px var(--gold-a55));
+}
+
+.style-neon .chew-ring.reached .ring-arc {
+  filter: drop-shadow(0 0 12px var(--gold)) drop-shadow(0 0 30px var(--gold-a55));
+}
+
+.style-neon .star-start,
+.style-neon .hud-stop {
+  box-shadow: 0 0 28px var(--gold-a55), 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* =====================================================================
+   Style switch + neon theme cards in settings
+   ===================================================================== */
+.style-switch {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.style-option {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--sheet-line);
+  background: var(--sheet-bg-2);
+  color: var(--sheet-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.style-option.on {
+  border-color: var(--gold);
+  color: var(--sheet-fg);
+}
+
+.style-option.neon.on {
+  box-shadow: 0 0 18px var(--gold-a45);
+  text-shadow: 0 0 12px var(--gold-a55);
+}
+
+.theme-card.neon .theme-swatch {
+  box-shadow: 0 0 12px var(--gold-a45), 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pause-count,
+  .chew-orb.reached,
+  .track-star.pop,
+  .star-screen.too-early .star-chewing,
+  .neon-glow {
+    animation: none;
+  }
+}
