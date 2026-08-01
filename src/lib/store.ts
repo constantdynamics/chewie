@@ -8,6 +8,8 @@ export const defaultSettings: Settings = {
   pauseSeconds: 5,
   chewColor: '#4ade80',
   pauseColor: '#f59e0b',
+  starColor: '#fbbf24',
+  starDeepColor: '#f59e0b',
   pulse: true,
   haptics: true,
   showTips: true,

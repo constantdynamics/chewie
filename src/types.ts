@@ -8,6 +8,9 @@ export interface Settings {
   pauseSeconds: number
   chewColor: string
   pauseColor: string
+  /** Accent colour for star mode (stars, ring, the lit-up result). */
+  starColor: string
+  starDeepColor: string
   pulse: boolean
   haptics: boolean
   showTips: boolean

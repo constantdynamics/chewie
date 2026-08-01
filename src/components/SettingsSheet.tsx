@@ -1,5 +1,6 @@
 import { Sheet } from './Sheet'
 import { ColorField, Note, Stepper, Toggle } from './ui'
+import { ThemePicker } from './ThemePicker'
 import { setState, updateSettings, useStore } from '../lib/store'
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
@@ -63,9 +64,15 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         onChange={(v) => updateSettings({ quickPauseSeconds: v })}
       />
 
-      <h3>Kleuren</h3>
+      <h3>Kleurthema</h3>
+      <ThemePicker />
       <ColorField label="Kauwkleur" value={s.chewColor} onChange={(v) => updateSettings({ chewColor: v })} />
       <ColorField label="Pauzekleur" value={s.pauseColor} onChange={(v) => updateSettings({ pauseColor: v })} />
+      <ColorField
+        label="Sterkleur"
+        value={s.starColor}
+        onChange={(v) => updateSettings({ starColor: v, starDeepColor: v })}
+      />
 
       <h3>Weergave</h3>
       <Toggle
