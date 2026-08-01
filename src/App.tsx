@@ -12,6 +12,7 @@ import type { StarSummary } from './hooks/useStarSession'
 import { addTile, setState, useStore } from './lib/store'
 import { makeTile } from './lib/chewart'
 import { contrastColor } from './lib/contrast'
+import { applyAccent } from './lib/color'
 import { pickTip } from './lib/tips'
 import type { Phase, Tile } from './types'
 
@@ -27,6 +28,13 @@ export default function App() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const hideTimer = useRef<number | undefined>(undefined)
   const sessionIdRef = useRef(1)
+
+  // The star-mode accent lives in CSS, so themes recolour it through custom properties.
+  // The browser/PWA chrome follows the chew colour so the whole app reads as one theme.
+  useEffect(() => {
+    applyAccent(s.starColor, s.starDeepColor, document.documentElement.style)
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', s.chewColor)
+  }, [s.starColor, s.starDeepColor, s.chewColor])
 
   const onBite = useCallback(() => {
     if (state.settings.haptics && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
