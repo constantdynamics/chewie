@@ -39,9 +39,30 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         unit="★"
         onChange={(v) => updateSettings({ starGoal: v })}
       />
+      <Stepper
+        label="Aanloop per hap"
+        value={s.biteLeadInSec}
+        min={0}
+        max={10}
+        step={1}
+        unit="sec"
+        onChange={(v) => updateSettings({ biteLeadInSec: v })}
+      />
+      <Toggle
+        label="Pauze loopt vanzelf"
+        desc="Na elke hap telt de pauze automatisch af en begint de volgende hap zelf. Eén tik per hap."
+        checked={s.autoPause}
+        onChange={(v) => updateSettings({ autoPause: v })}
+      />
+      <Toggle
+        label="Cirkeldiagram tonen"
+        desc="De ronde kauwmeter. Uit laat alleen een gloeiend seintje zien wanneer je lang genoeg kauwt."
+        checked={s.showRing}
+        onChange={(v) => updateSettings({ showRing: v })}
+      />
       <Note>
-        Een hap verdient een ster als je minstens <b>{s.chewSeconds} seconden</b> kauwt — dat is je kauwtijd
-        hierboven. Zet je die hoger, dan wordt een ster ook zwaarder verdiend.
+        Een hap verdient een ster als je na de aanloop minstens <b>{s.chewSeconds} seconden</b> kauwt — dat is je
+        kauwtijd hierboven. De eerste <b>{s.biteLeadInSec} seconden</b> tellen niet mee, want dan neem je de hap nog.
       </Note>
 
       <h3>Snelle modus</h3>
@@ -63,6 +84,26 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         unit="sec"
         onChange={(v) => updateSettings({ quickPauseSeconds: v })}
       />
+
+      <h3>Stijl</h3>
+      <div className="style-switch" role="radiogroup" aria-label="Stijl">
+        {(['calm', 'neon'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={s.uiStyle === v}
+            className={`style-option${s.uiStyle === v ? ' on' : ''}${v === 'neon' ? ' neon' : ''}`}
+            onClick={() => updateSettings({ uiStyle: v })}
+          >
+            {v === 'calm' ? 'Rustig' : 'Neon'}
+          </button>
+        ))}
+      </div>
+      <Note>
+        <b>Rustig</b> vult het scherm met een zachte kleur. <b>Neon</b> maakt het scherm bijna zwart en laat de kleur
+        oplichten — fijn in het donker.
+      </Note>
 
       <h3>Kleurthema</h3>
       <ThemePicker />

@@ -14,9 +14,11 @@ export function MealScreen(props: {
   tip: string | null
   hideNumbers: boolean
   preview: Tile | null
+  /** Set in the neon style: the phase colour becomes a glow on a dark screen. */
+  glowColor?: string
   onTap: () => void
 }) {
-  const { phase, running, bg, fg, quick, bite, progress, pulse, tip, hideNumbers, preview, onTap } = props
+  const { phase, running, bg, fg, quick, bite, progress, pulse, tip, hideNumbers, preview, glowColor, onTap } = props
 
   const label = phase === 'pause' ? 'Pauze' : phase === 'chew' ? 'Kauwen' : 'Chewie'
   const sub = !running
@@ -31,6 +33,13 @@ export function MealScreen(props: {
       style={{ background: bg, color: fg }}
       onClick={onTap}
     >
+      {glowColor && (
+        <div
+          className="neon-glow"
+          aria-hidden
+          style={{ background: `radial-gradient(circle at 50% 46%, ${glowColor}55, ${glowColor}14 38%, transparent 68%)` }}
+        />
+      )}
       {running && preview && (
         <div
           className="tile-preview"
