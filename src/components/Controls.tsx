@@ -12,6 +12,8 @@ export function Controls(props: {
   onGallery: () => void
   onNourishment: () => void
   onSettings: () => void
+  /** Only offered between meals — switching mid-meal would throw away the session. */
+  onSwitchToStars?: () => void
 }) {
   const { visible, running, quick, fg, bg, onToggleRun, onQuick, onReset, onGallery, onNourishment, onSettings } = props
 
@@ -19,6 +21,11 @@ export function Controls(props: {
 
   return (
     <div className={`controls${visible ? '' : ' hidden'}`} onClick={stop}>
+      {props.onSwitchToStars && (
+        <button className="mode-swap on-light" style={{ color: fg }} onClick={props.onSwitchToStars}>
+          ★ Sterrenmodus — score elke hap
+        </button>
+      )}
       <button
         className="primary-btn"
         style={{ background: fg, color: bg }}

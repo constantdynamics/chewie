@@ -26,6 +26,13 @@ Google Play** with Capacitor.
 - Settings: chew/pause times, colours, gentle edge pulse, haptics, tips, and a “hide numbers”
   calm mode.
 - Quick Mode for snacks; gentle tips during pauses.
+- **Star mode** — you time every bite yourself. Tap when you take a bite, tap when you
+  swallow; reach your chew target and the bite earns a star. The screen stays dark while you
+  chew (a dim ring quietly fills and turns gold once you're past the target) and **lights up**
+  with the duration and verdict the moment a bite ends. Fill 25 stars to complete a meal, and
+  **double-tap any time** to see the full card: star grid, average and longest bite, hit rate.
+- **Leaderboard** — your own meals ranked by stars and average bite length, with medals and
+  personal records. Local to the device; you play against yourself.
 - **ChewArt** — a unique generative tile per meal, a growing gallery, and simple stats.
 - **Nourishment Mode** (opt-in): enter height/weight/age/sex/activity → BMI, WHO healthy-weight
   range and Mifflin–St Jeor energy needs → a per-meal **two-sided** target band. After a meal you

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Sheet } from './Sheet'
 import { NumberField, Note, SelectField } from './ui'
 import { CameraIcon } from './Icons'
+import { Star, StarGrid } from './StarGrid'
 import { renderTileSVG } from '../lib/chewart'
 import { FOODS, estimateKcal, foodByKey } from '../lib/foods'
 import { perMealTarget, portionBalance } from '../lib/nourishment'
@@ -13,6 +14,10 @@ function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
+function fmtSec(s: number): string {
+  return `${s.toFixed(1).replace('.', ',')}\u00A0s`
 }
 
 function scoreMessage(s: number): string {
@@ -31,6 +36,14 @@ export function MealDoneSheet({ tile, onClose }: { tile: Tile; onClose: () => vo
   const [foodKey, setFoodKey] = useState('mixed')
   const [photo, setPhoto] = useState<string | undefined>(undefined)
   const [logged, setLogged] = useState<{ kcal: number; score: number } | null>(null)
+
+  const isStars = tile.mode === 'stars'
+  const goal = tile.starGoal ?? state.settings.starGoal
+  const stars = tile.stars ?? 0
+  const starMeals = state.tiles
+    .filter((t) => t.mode === 'stars')
+    .sort((a, b) => (b.stars ?? 0) - (a.stars ?? 0) || (b.avgBiteSec ?? 0) - (a.avgBiteSec ?? 0) || b.id - a.id)
+  const place = starMeals.findIndex((t) => t.id === tile.id) + 1
 
   async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -55,13 +68,40 @@ export function MealDoneSheet({ tile, onClose }: { tile: Tile; onClose: () => vo
       <div className="done-head">
         <span dangerouslySetInnerHTML={{ __html: renderTileSVG(tile, 108) }} />
         <div>
-          <div className="done-title">Nieuwe tegel! 🎉</div>
+          <div className="done-title">{isStars && stars >= goal ? 'Kaart vol! 🎉' : 'Nieuwe tegel! 🎉'}</div>
           <div className="done-sub">
             {tile.bites} happen · {fmtDuration(tile.durationSec)}
             {tile.quick ? ' · snel' : ''}
           </div>
         </div>
       </div>
+
+      {isStars && (
+        <div className="done-stars">
+          <div className="done-stars-score">
+            <Star size={26} filled glow />
+            <b>{stars}</b>
+            <small>/ {goal} sterren</small>
+          </div>
+          <StarGrid earned={stars} goal={goal} />
+          <div className="hud-stats">
+            <div>
+              <b>{fmtSec(tile.avgBiteSec ?? 0)}</b>
+              <small>gemiddeld</small>
+            </div>
+            <div>
+              <b>{fmtSec(tile.bestBiteSec ?? 0)}</b>
+              <small>langste hap</small>
+            </div>
+            <div>
+              <b>{tile.bites ? `${Math.round((stars / tile.bites) * 100)}%` : '—'}</b>
+              <small>raak</small>
+            </div>
+          </div>
+          {place === 1 && starMeals.length > 1 && <div className="done-record">🏆 Nieuw persoonlijk record!</div>}
+          {place > 1 && <div className="done-place">#{place} op je ranglijst</div>}
+        </div>
+      )}
 
       {!canLog ? (
         <>

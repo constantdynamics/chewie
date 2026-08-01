@@ -13,6 +13,7 @@ export const defaultSettings: Settings = {
   showTips: true,
   quickChewSeconds: 10,
   quickPauseSeconds: 3,
+  starGoal: 25,
 }
 
 const defaultState: AppState = {
@@ -23,6 +24,7 @@ const defaultState: AppState = {
   hideNumbers: false,
   stats: { totalSessions: 0, totalBites: 0, totalDurationSec: 0, bestSession: 0, lastDate: null },
   onboarded: false,
+  mode: 'rhythm',
   version: 1,
 }
 
